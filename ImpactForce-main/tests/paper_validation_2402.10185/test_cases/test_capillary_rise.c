@@ -49,11 +49,12 @@
  */
 
 #include "grid/quadtree.h"
-#include "embed.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/myembed.h"
 #include "navier-stokes/centered.h"
-#include "two-phase.h"
-#include "tension.h"
-#include "contact.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_two-phase.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_tension.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_vof.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_contact.h"
 
 // Physical parameters
 #define TUBE_RADIUS 0.2           // Tube inner radius
@@ -112,11 +113,10 @@ double measure_contact_angle() {
                 n_interface.y /= norm;
             }
 
-            // Tube wall normal (pointing inward)
-            double r = sqrt(sq(x) + sq(z));
+            // Tube wall normal (pointing inward) - 2D: radial from x=0
+            double r = fabs(x);
             if (r > 0.01) {
-                double n_wall_x = -x / r;
-                double n_wall_z = -z / r;
+                double n_wall_x = (x < 0) ? 1.0 : -1.0;  // Points toward centerline
 
                 // Calculate angle between interface and wall
                 double dot = n_interface.x * n_wall_x;
@@ -139,9 +139,9 @@ int main(int argc, char *argv[]) {
         else if (argv[i][0] == 'A') THETA_DEG = atof(&argv[i][1]);
     }
 
-    // Setup domain
+    // Setup domain (2D)
     size(TUBE_HEIGHT);
-    origin(0, 0, -TUBE_HEIGHT/2.0);
+    origin(-TUBE_RADIUS, -TUBE_HEIGHT/2.0);
     init_grid(1 << 6);
 
     // Fluid properties
@@ -180,11 +180,11 @@ int main(int argc, char *argv[]) {
 
 // Initialize embedded tube
 event init(i = 0) {
-    // Create embedded cylinder (tube wall)
+    // Create embedded channel walls (2D: vertical walls at x = ±TUBE_RADIUS)
     vertex scalar phi[];
     foreach_vertex() {
-        double r = sqrt(sq(x) + sq(z));
-        phi[] = r - TUBE_RADIUS;  // Negative inside tube
+        double r = fabs(x);
+        phi[] = r - TUBE_RADIUS;  // Negative inside channel
     }
     fractions(phi, cs, fs);
 

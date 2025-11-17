@@ -46,11 +46,12 @@
  */
 
 #include "grid/quadtree.h"
-#include "embed.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/myembed.h"
 #include "navier-stokes/centered.h"
-#include "two-phase.h"
-#include "tension.h"
-#include "contact.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_two-phase.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_tension.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_vof.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_contact.h"
 
 // Physical parameters
 #define CYLINDER_RADIUS 1.0       // Substrate radius
@@ -176,18 +177,12 @@ int main(int argc, char *argv[]) {
 
 // Initialize embedded geometry
 event init(i = 0) {
-    // Create embedded cylinder or sphere
+    // Create embedded cylinder (2D: circular cross-section)
     vertex scalar phi[];
     foreach_vertex() {
-        if (GEOMETRY_TYPE == 0) {
-            // Horizontal cylinder
-            double r = sqrt(sq(x) + sq(z));
-            phi[] = r - CYLINDER_RADIUS;
-        } else {
-            // Sphere
-            double r = sqrt(sq(x) + sq(y) + sq(z));
-            phi[] = r - CYLINDER_RADIUS;
-        }
+        // In 2D, both cylinder and sphere are represented as circles
+        double r = sqrt(sq(x) + sq(y));
+        phi[] = r - CYLINDER_RADIUS;
     }
     fractions(phi, cs, fs);
 
