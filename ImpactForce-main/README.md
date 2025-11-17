@@ -12,7 +12,7 @@ Vinod Thale (September 15, 2023)
 
 ## Features
 
-- **Axisymmetric 3D simulations** of compound drop impacts
+- **2D axisymmetric simulations** of compound drop impacts
 - **Two-phase flow modeling** with surface tension
 - **Adaptive mesh refinement** for capturing interface dynamics
 - **MPI parallelization** for high-performance computing
