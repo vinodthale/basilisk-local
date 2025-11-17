@@ -391,16 +391,312 @@ cd validation
 ./test_mass_conservation 2>&1 | tee debug.log
 ```
 
-### Common Solutions
+### Common Issues and Solutions
 
-| Problem | Solution |
-|---------|----------|
-| qcc not found | Build Basilisk, add to PATH |
-| Headers not found | Check Sharp VOF directory location |
-| Test crashes | Reduce grid levels, check parameters |
-| Mass not conserved | Increase resolution, check TOLERANCE |
-| Angle wrong | Verify CONTACT_ANGLE_SUBSTRATE setting |
-| Slow tests | Use --quick mode, reduce MAX_GRID_LEVEL |
+#### Issue 1: qcc not found
+
+**Error Message**:
+```
+Error: qcc (Basilisk compiler) not found in PATH
+```
+
+**Solution**:
+```bash
+# Navigate to Basilisk src directory
+cd /home/user/basilisk-local/src
+
+# Build Basilisk
+make
+
+# Add to PATH (temporary)
+export PATH=$PATH:$(pwd)
+
+# Add to PATH (permanent)
+echo "export BASILISK=$(pwd)" >> ~/.bashrc
+echo 'export PATH=$PATH:$BASILISK' >> ~/.bashrc
+source ~/.bashrc
+
+# Verify
+which qcc
+qcc --version
+```
+
+#### Issue 2: Header files not found
+
+**Error Message**:
+```
+fatal error: ../2D-sharp-and-conservative-VOF-method-Basiliks-main/myembed.h: No such file or directory
+```
+
+**Cause**: Sharp VOF headers not in expected location
+
+**Solution**:
+```bash
+# Check directory structure
+ls -la /home/user/basilisk-local/
+
+# Should show:
+# ImpactForce-main/
+# 2D-sharp-and-conservative-VOF-method-Basiliks-main/
+
+# If headers are elsewhere, update paths in constants-sharp.h
+cd ../..
+nano ImpactForce-main/constants-sharp.h
+
+# Update lines 7-12 with correct paths
+```
+
+#### Issue 3: Test compiles but crashes
+
+**Error Message**:
+```
+Segmentation fault
+# or
+Floating point exception
+```
+
+**Common Causes & Solutions**:
+
+1. **Grid too fine for available memory**:
+   ```bash
+   # Reduce MAX_GRID_LEVEL
+   # Edit test file or use command line:
+   ./test_mass_conservation X11 N9  # Instead of X12
+   ```
+
+2. **Unstable parameters**:
+   ```bash
+   # Reduce Reynolds/Weber numbers
+   # Edit constants-sharp.h:
+   #define REYNOLDS 500.0   # Instead of 1000
+   #define WEBER 50.0       # Instead of 100
+   ```
+
+3. **TOLERANCE too strict**:
+   ```bash
+   # Edit constants-sharp.h:
+   #define TOLERANCE 1e-5   # Instead of 1e-6
+   ```
+
+#### Issue 4: Mass conservation test fails
+
+**Error Message**:
+```
+TEST STATUS: ✗ FAIL
+Mass conservation violated!
+Error 2.345e-08 exceeds tolerance 1.0e-10
+```
+
+**Solutions**:
+
+1. **Increase grid resolution**:
+   ```bash
+   ./test_mass_conservation X13 N10  # Higher resolution
+   ```
+
+2. **Check for numerical instabilities**:
+   ```bash
+   # Look in log for warnings
+   grep -i "warning\|error\|nan" results/test_*.log
+   ```
+
+3. **Verify initial conditions**:
+   ```bash
+   # Check initial volume is reported correctly
+   grep "Initial drop volume" results/test_*.log
+   ```
+
+4. **Use thorough mode**:
+   ```bash
+   ./run_all_tests.sh --thorough  # Instead of --quick
+   ```
+
+#### Issue 5: Contact angle test fails
+
+**Error Message**:
+```
+TEST STATUS: ✗ FAIL
+Contact angle error 12.34° exceeds tolerance 5.0°
+```
+
+**Solutions**:
+
+1. **Verify angle specification**:
+   ```bash
+   # Check constants-sharp.h
+   grep CONTACT_ANGLE_SUBSTRATE ../../constants-sharp.h
+
+   # Should match test angle
+   ```
+
+2. **Allow more time for equilibration**:
+   ```c
+   // Edit test_contact_angle.c
+   #define MAX_TIME 5.0  // Instead of 3.0
+   ```
+
+3. **Increase grid resolution near contact line**:
+   ```bash
+   ./test_contact_angle X13 N10
+   ```
+
+4. **Check measurement**:
+   ```bash
+   # Plot angle evolution
+   cd utilities
+   python3 plot_validation.py --angle
+   # Visual inspection may reveal issues
+   ```
+
+#### Issue 6: Tests are very slow
+
+**Symptoms**: Tests take hours instead of minutes
+
+**Solutions**:
+
+1. **Use quick mode**:
+   ```bash
+   ./run_all_tests.sh --quick  # 9-10 levels instead of 9-12
+   ```
+
+2. **Reduce grid levels**:
+   ```bash
+   # Edit test files
+   #define MAX_GRID_LEVEL 11  # Instead of 12
+   #define INITAL_GRID_LEVEL 9
+   ```
+
+3. **Reduce simulation time**:
+   ```c
+   #define MAX_TIME 1.0  # Instead of 2.0
+   ```
+
+4. **Less frequent output**:
+   ```c
+   #define SAVE_FILE_EVERY 0.05  # Instead of 0.01
+   ```
+
+5. **Use MPI (if available)**:
+   ```bash
+   # Compile with MPI
+   qcc -source -D_MPI=1 test_mass_conservation.c
+   mpicc -O2 -Wall -std=c99 -D_MPI=1 _test_mass_conservation.c -o test_mass_conservation -lm
+
+   # Run in parallel
+   mpirun -np 4 ./test_mass_conservation
+   ```
+
+#### Issue 7: Python analysis fails
+
+**Error Message**:
+```
+ModuleNotFoundError: No module named 'numpy'
+# or
+No module named 'matplotlib'
+```
+
+**Solution**:
+```bash
+# Install required packages
+pip3 install numpy matplotlib scipy pandas
+
+# Or use conda
+conda install numpy matplotlib scipy pandas
+
+# Verify
+python3 -c "import numpy, matplotlib; print('OK')"
+```
+
+#### Issue 8: No results files generated
+
+**Symptoms**: `results/` directory is empty
+
+**Causes & Solutions**:
+
+1. **Directory doesn't exist**:
+   ```bash
+   mkdir -p results
+   ```
+
+2. **Test exited early**:
+   ```bash
+   # Check test log
+   cat results/test_*_compile.log
+   # Look for compilation errors
+   ```
+
+3. **Permissions issue**:
+   ```bash
+   # Check write permissions
+   ls -la results/
+   chmod 755 results/
+   ```
+
+#### Issue 9: Test passes but results look wrong
+
+**Symptoms**: Volume ratio oscillates, angles jump around
+
+**Solutions**:
+
+1. **Check numerical stability**:
+   ```bash
+   # Plot results to visualize
+   cd utilities
+   python3 plot_validation.py --mass
+   ```
+
+2. **Increase resolution**:
+   ```bash
+   # Grid may be too coarse
+   ./run_all_tests.sh --thorough
+   ```
+
+3. **Check CFL warnings**:
+   ```bash
+   grep -i "cfl" results/test_*.log
+   ```
+
+#### Issue 10: Comparison with literature fails
+
+**Symptoms**: Results don't match expected values from papers
+
+**Check**:
+
+1. **Same non-dimensional parameters**:
+   ```bash
+   # Verify Re, We, Fr match literature
+   grep "Re.*We" results/test_*.log
+   ```
+
+2. **Same initial conditions**:
+   ```bash
+   # Drop diameter, velocity, etc.
+   cat results/parameters.txt
+   ```
+
+3. **Same contact angle**:
+   ```bash
+   grep "Contact_Angle" results/parameters.txt
+   ```
+
+4. **Sufficient grid resolution**:
+   ```bash
+   # Literature may use finer grids
+   # Try increasing MAX_GRID_LEVEL
+   ```
+
+### Quick Troubleshooting Checklist
+
+- [ ] Basilisk compiled and `qcc` in PATH
+- [ ] Sharp VOF headers in correct location
+- [ ] Test compiles without errors
+- [ ] `results/` directory exists and writable
+- [ ] Grid resolution appropriate (9-12 for validation)
+- [ ] Parameters physically reasonable (Re, We, etc.)
+- [ ] Python packages installed (for analysis)
+- [ ] Sufficient disk space for results
+- [ ] Sufficient RAM for grid resolution
+- [ ] Test logs checked for warnings/errors
 
 ## Summary Commands
 
