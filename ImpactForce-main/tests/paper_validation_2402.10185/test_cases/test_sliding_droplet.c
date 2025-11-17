@@ -41,11 +41,12 @@
  */
 
 #include "grid/quadtree.h"
-#include "embed.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/myembed.h"
 #include "navier-stokes/centered.h"
-#include "two-phase.h"
-#include "tension.h"
-#include "contact.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_two-phase.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_tension.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_vof.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_contact.h"
 
 // Test parameters
 #define R0 0.5                    // Initial droplet radius
@@ -117,8 +118,8 @@ void measure_droplet(double *radius, double *height) {
 
     foreach(reduction(max:max_r) reduction(max:max_h) reduction(+:sum_vol)) {
         if (f[] > 0.5) {
-            // Distance from center along plane
-            double r = sqrt(sq(y) + sq(z));
+            // Distance from center along plane (2D: x coordinate)
+            double r = fabs(x);
             if (r > max_r) max_r = r;
 
             // Height perpendicular to plane
@@ -227,8 +228,8 @@ event init(i = 0) {
     }
     fractions(phi, cs, fs);
 
-    // Initialize droplet as half-sphere on plane
-    fraction(f, -sqrt(sq(x) + sq(y) + sq(z)) + R0);
+    // Initialize droplet as half-disk on plane (2D)
+    fraction(f, -sqrt(sq(x) + sq(y)) + R0);
 
     // Set contact angle
     foreach() {

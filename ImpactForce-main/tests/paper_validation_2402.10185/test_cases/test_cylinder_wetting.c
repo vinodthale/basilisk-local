@@ -48,11 +48,12 @@
  */
 
 #include "grid/quadtree.h"
-#include "embed.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/myembed.h"
 #include "navier-stokes/centered.h"
-#include "two-phase.h"
-#include "tension.h"
-#include "contact.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_two-phase.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_tension.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_vof.h"
+#include "../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_contact.h"
 
 // Physical parameters
 #define R0 0.5                    // Initial droplet radius
@@ -187,10 +188,10 @@ event init(i = 0) {
     }
     fractions(phi, cs, fs);
 
-    // Initialize droplet as circle on top of cylinder
+    // Initialize droplet as circle on top of cylinder (2D)
     // Center droplet above cylinder
     double y_center = RC + R0;
-    fraction(f, -sqrt(sq(x) + sq(y - y_center) + sq(z)) + R0);
+    fraction(f, -sqrt(sq(x) + sq(y - y_center)) + R0);
 
     // Set contact angle
     double theta_rad = THETA_S * M_PI / 180.0;

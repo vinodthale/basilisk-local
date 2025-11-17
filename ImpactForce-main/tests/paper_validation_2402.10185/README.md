@@ -14,6 +14,20 @@ This test suite implements the validation cases from the paper to verify the imp
 - **Moving Contact Lines**: Navier slip and no-slip boundary conditions
 - **Mass Conservation**: Validation of volume conservation in three-phase systems
 
+### Implementation Details
+
+**Contact Angle Method**: These tests use the **Sharp VOF** implementation for contact angles on embedded boundaries,
+based on Huang et al. (2025) "A 2D sharp and conservative VOF method for modeling the contact line dynamics
+with hysteresis on complex boundary" (J. Comput. Phys.).
+
+This implementation differs from standard Basilisk `contact.h` which only supports contact angles on flat
+grid-aligned boundaries. The Sharp VOF method uses a ghost cell approach to impose contact angles on arbitrary
+embedded boundaries, as described in the Tavares et al. paper.
+
+**2D Simplifications**: All tests use 2D Cartesian grids (`quadtree`). Some physical configurations that are
+inherently 3D or axisymmetric (e.g., capillary tubes, cylindrical films) are approximated as 2D cross-sections
+or equivalent 2D geometries for computational efficiency.
+
 ## Directory Structure
 
 ```
@@ -228,11 +242,19 @@ qcc -O2 test_cylinder_wetting.c -o test_cylinder_wetting -lm
 
 ## Running Tests
 
+### Compilation Requirements
+
+**IMPORTANT**: These tests require the Sharp VOF implementation for embedded contact angles.
+The standard Basilisk `contact.h` does NOT support embedded boundaries.
+
+The tests are configured to use the Sharp VOF headers from:
+`../../../2D-sharp-and-conservative-VOF-method-Basiliks-main/`
+
 ### Individual Test
 ```bash
 cd test_cases
 
-# Compile specific test
+# Compile specific test (Sharp VOF headers included automatically)
 qcc -O2 test_sliding_droplet.c -o test_sliding_droplet -lm
 
 # Run with parameters
@@ -241,6 +263,9 @@ qcc -O2 test_sliding_droplet.c -o test_sliding_droplet -lm
 # Check results
 cat ../results/sliding_droplet/angle60_plane0_eo0.00.txt
 ```
+
+**Note**: If compilation fails with "file not found" errors, verify that the Sharp VOF
+implementation is available at the expected path relative to the test directory.
 
 ### All Tests
 ```bash
