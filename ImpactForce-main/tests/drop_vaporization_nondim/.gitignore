@@ -1,0 +1,45 @@
+# Compiled executables
+test_cases/*.out
+test_cases/*.tst
+test_cases/test_drop_vap_nondim
+
+# Object files
+*.o
+*.obj
+
+# Results and output
+results/
+*.vtk
+*.dat
+*.dump
+*.log
+*.txt
+
+# Temporary files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Plots
+*.png
+*.pdf
+*.svg
+*.eps
+
+# Core dumps
+core
+core.*
+
+# Basilisk generated files
+_*.c
+*.s
+
+# Keep directory structure
+!results/.gitkeep
+!reference_data/.gitkeep
