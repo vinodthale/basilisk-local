@@ -1,0 +1,19 @@
+# Build artifacts
+build/.qcc*
+build/*.o
+build/*.s
+build/*.c.page
+build/drop_vap
+build/drop_vap_*
+build/test_*
+build/fig10_*
+build/static_bubble*
+
+# Results
+results/*
+!results/.gitkeep
+
+# Temporary files
+*.swp
+*~
+.DS_Store
