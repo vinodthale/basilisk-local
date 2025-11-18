@@ -1,0 +1,570 @@
+---
+# ==============================================================================
+# Axisymmetric Drop Vaporization - Equation Specification
+# ==============================================================================
+# Reference: Boyd & Ling 2023, Computers and Fluids (Figure 10)
+# Complete nondimensional formulation for two-phase flow with evaporation
+# ==============================================================================
+
+metadata:
+  title: "Axisymmetric Drop Vaporization with Phase Change"
+  reference: "Boyd & Ling 2023, Computers and Fluids"
+  figure: "Figure 10"
+  geometry: "2D axisymmetric"
+  physics:
+    - "Two-phase incompressible flow"
+    - "Heat transfer with phase change"
+    - "Surface tension"
+    - "Interface tracking (VOF)"
+
+# ==============================================================================
+# NONDIMENSIONALIZATION
+# ==============================================================================
+
+nondimensionalization:
+  reference_scales:
+    length: "D₀ (drop diameter)"
+    velocity: "U∞ (free-stream velocity)"
+    density: "ρ_g (gas density)"
+    time: "t_ref = D₀ / U∞"
+    pressure: "p_ref = ρ_g U∞²"
+    temperature: "ΔT = T∞ - T_sat"
+    mass_flux: "ṁ_ref = ρ_g U∞"
+
+  dimensionless_groups:
+    reynolds:
+      symbol: "Re"
+      definition: "Re = ρ_g U∞ D₀ / μ_g"
+      physical_meaning: "Ratio of inertial to viscous forces"
+      value_range: [22, 200]
+      notes: "Swept parameter in parameter study"
+
+    weber:
+      symbol: "We"
+      definition: "We = ρ_g U∞² D₀ / σ"
+      physical_meaning: "Ratio of inertial to surface tension forces"
+      value: 1.5
+      notes: "Fixed for all cases"
+
+    stefan:
+      symbol: "St"
+      definition: "St = c_p,g (T∞ - T_sat) / h_lg"
+      physical_meaning: "Ratio of sensible to latent heat"
+      value: 0.1
+      notes: "Controls evaporation rate"
+
+    prandtl:
+      symbol: "Pr"
+      definition: "Pr = μ_g c_p,g / k_g"
+      physical_meaning: "Ratio of momentum to thermal diffusivity"
+      value: 1.0
+      notes: "Fixed for this study"
+
+  material_ratios:
+    density_ratio:
+      symbol: "η"
+      definition: "η = ρ_g / ρ_l"
+      value: 0.000623
+      dimensional_value: "0.597 / 958.4"
+
+    viscosity_ratio:
+      symbol: "μ_ratio"
+      definition: "μ_ratio = μ_g / μ_l"
+      value: 0.045
+      dimensional_value: "1.26e-5 / 2.8e-4"
+
+    thermal_conductivity_ratio:
+      symbol: "k_ratio"
+      definition: "k_ratio = k_g / k_l"
+      value: 0.0368
+      dimensional_value: "0.025 / 0.679"
+
+    heat_capacity_ratio:
+      symbol: "c_ratio"
+      definition: "c_ratio = c_p,g / c_p,l"
+      value: 0.4815
+      dimensional_value: "2030 / 4216"
+
+# ==============================================================================
+# GOVERNING EQUATIONS (NONDIMENSIONAL FORM)
+# ==============================================================================
+
+governing_equations:
+
+  # Continuity equation with evaporation
+  continuity:
+    name: "Mass conservation with phase change"
+    equation: "∂ρ*/∂t* + ∇·(ρ* u*) = 0"
+    description: "Conservation of mass in each phase"
+    source_term: "Phase change at interface handled via VOF advection"
+    notes:
+      - "ρ* = ρ / ρ_g (nondimensional density)"
+      - "u* = u / U∞ (nondimensional velocity)"
+      - "t* = t U∞ / D₀ (nondimensional time)"
+
+  # Momentum equation (Navier-Stokes)
+  momentum:
+    name: "Navier-Stokes equations"
+    equation: "ρ* (∂u*/∂t* + u*·∇u*) = -∇p* + (1/Re) ∇·[μ*(∇u* + ∇u*ᵀ)] + (1/We) κ*n*δ_s"
+    terms:
+      inertia: "ρ* (∂u*/∂t* + u*·∇u*)"
+      pressure_gradient: "-∇p*"
+      viscous_stress: "(1/Re) ∇·[μ*(∇u* + ∇u*ᵀ)]"
+      surface_tension: "(1/We) κ*n*δ_s"
+    descriptions:
+      p_star: "p* = p / (ρ_g U∞²) - nondimensional pressure"
+      mu_star: "μ* = μ / μ_g - nondimensional dynamic viscosity"
+      kappa_star: "κ* = κ D₀ - nondimensional curvature"
+      n_star: "n* - unit normal to interface"
+      delta_s: "δ_s - Dirac delta at interface"
+    notes:
+      - "Two-phase: ρ* and μ* jump across interface"
+      - "ρ* = 1/η in liquid, ρ* = 1 in gas"
+      - "μ* = 1/μ_ratio in liquid, μ* = 1 in gas"
+
+  # VOF equation for interface tracking
+  vof:
+    name: "Volume-of-Fluid (VOF) advection"
+    equation: "∂f/∂t* + u*·∇f = ṁ*/ρ_l*"
+    description: "Tracks liquid volume fraction"
+    terms:
+      advection: "∂f/∂t* + u*·∇f"
+      evaporation_source: "ṁ*/ρ_l*"
+    variable_definition:
+      f: "Volume fraction (f=1 in liquid, f=0 in gas)"
+      m_dot_star: "ṁ* = ṁ / (ρ_g U∞) - nondimensional mass flux"
+    notes:
+      - "Interface is at f = 0.5 contour"
+      - "Normal vector: n = -∇f / |∇f|"
+      - "Curvature: κ = ∇·n"
+
+  # Energy equation with phase change
+  energy:
+    name: "Temperature advection-diffusion with evaporation"
+    equation: "∂T*/∂t* + u*·∇T* = (1/(Re Pr)) ∇·(α* ∇T*) - (St ṁ*)/(ρ* c_p*)"
+    terms:
+      advection: "∂T*/∂t* + u*·∇T*"
+      conduction: "(1/(Re Pr)) ∇·(α* ∇T*)"
+      latent_heat_sink: "-(St ṁ*)/(ρ* c_p*)"
+    descriptions:
+      T_star: "T* = (T - T_sat)/(T∞ - T_sat) - nondimensional temperature"
+      alpha_star: "α* = α / α_g - nondimensional thermal diffusivity"
+      alpha_def: "α = k/(ρ c_p) - thermal diffusivity"
+      c_p_star: "c_p* = c_p / c_p,g - nondimensional specific heat"
+    phase_properties:
+      liquid:
+        alpha_l_star: "α_l* = (k_l/k_g) (ρ_g c_p,g)/(ρ_l c_p,l)"
+        c_p_l_star: "c_p,l* = c_p,l / c_p,g"
+      gas:
+        alpha_g_star: "α_g* = 1"
+        c_p_g_star: "c_p,g* = 1"
+    notes:
+      - "T* = 0 at saturation temperature"
+      - "T* = 1 at free-stream temperature"
+      - "Latent heat absorbed at interface reduces temperature"
+
+# ==============================================================================
+# INTERFACE CONDITIONS
+# ==============================================================================
+
+interface_conditions:
+
+  # Mass flux at interface (Stefan condition)
+  mass_flux:
+    name: "Stefan condition for evaporation"
+    equation: "ṁ* = -(1/(St Re Pr)) |∇T*|_interface"
+    description: "Mass flux from liquid to gas phase"
+    derivation:
+      dimensional: "ṁ = k_g |∇T|_interface / h_lg"
+      gradient: "|∇T| = (T∞ - T_sat)|∇T*| / D₀"
+      substitution: "ṁ = k_g (T∞ - T_sat)|∇T*| / (D₀ h_lg)"
+      stefan_definition: "St = c_p,g (T∞ - T_sat) / h_lg"
+      prandtl_definition: "Pr = μ_g c_p,g / k_g"
+      nondimensional: "ṁ* = ṁ/(ρ_g U∞) = -(k_g/(ρ_g U∞ D₀ St h_lg))|∇T*|"
+      final: "ṁ* = -(1/(St Re Pr)) |∇T*|_interface"
+    notes:
+      - "Positive ṁ* indicates evaporation (liquid→gas)"
+      - "Evaluated on gas side of interface"
+      - "Couples temperature field to VOF evolution"
+
+  # Temperature jump (assumed continuous)
+  temperature_continuity:
+    equation: "T*_l = T*_g at interface"
+    description: "Temperature is continuous across interface"
+    notes:
+      - "Both phases at saturation temperature at interface"
+      - "No temperature jump in this model"
+
+  # Velocity jump due to evaporation
+  velocity_jump:
+    liquid_velocity: "u_l* = u_interface* - ṁ*/ρ_l*"
+    gas_velocity: "u_g* = u_interface* - ṁ*/ρ_g*"
+    description: "Velocity discontinuity due to mass flux"
+    notes:
+      - "Kinematic boundary condition"
+      - "Mass conservation at interface"
+
+# ==============================================================================
+# BOUNDARY CONDITIONS
+# ==============================================================================
+
+boundary_conditions:
+
+  left_inflow:
+    type: "Dirichlet (inflow)"
+    conditions:
+      velocity:
+        u_x: 1.0
+        u_y: 0.0
+        description: "Uniform free-stream velocity"
+      pressure:
+        type: "Neumann"
+        value: 0.0
+      vof:
+        f: 0.0
+        description: "Pure gas phase"
+      temperature:
+        T: 1.0
+        description: "Free-stream temperature"
+
+  right_outflow:
+    type: "Neumann (outflow)"
+    conditions:
+      velocity:
+        type: "Neumann"
+        value: 0.0
+      pressure:
+        type: "Dirichlet"
+        value: 0.0
+        description: "Pressure outlet"
+      vof:
+        type: "Neumann"
+        value: 0.0
+      temperature:
+        type: "Neumann"
+        value: 0.0
+
+  top_boundary:
+    type: "Outflow/Symmetry"
+    conditions:
+      velocity:
+        type: "Neumann"
+        value: 0.0
+      pressure:
+        type: "Dirichlet"
+        value: 0.0
+      vof:
+        type: "Neumann"
+        value: 0.0
+      temperature:
+        type: "Neumann"
+        value: 0.0
+
+  axis_symmetry:
+    type: "Axisymmetric boundary (r=0)"
+    description: "Automatically handled by axisymmetric solver"
+    notes:
+      - "No penetration: u_r = 0"
+      - "Symmetry: ∂u_x/∂r = 0"
+      - "Symmetry for scalars: ∂f/∂r = 0, ∂T/∂r = 0"
+
+# ==============================================================================
+# INITIAL CONDITIONS
+# ==============================================================================
+
+initial_conditions:
+
+  geometry:
+    domain:
+      size_x: 8.0
+      size_r: 8.0
+      description: "Square domain 8D₀ × 8D₀"
+
+    drop:
+      shape: "Sphere"
+      radius: 0.5
+      center_x: 1.5
+      center_r: 0.0
+      description: "Spherical drop centered at (1.5D₀, 0)"
+
+  velocity_field:
+    initialization: "Uniform flow"
+    u_x: 1.0
+    u_r: 0.0
+    description: "Uniform free-stream velocity everywhere"
+
+  vof_field:
+    equation: "f = 1 if r² ≤ R₀², else f = 0"
+    description: "Sharp interface initially"
+    R0: 0.5
+    notes:
+      - "r² = (x - x_c)² + y²"
+      - "x_c = 1.5, y_c = 0"
+
+  temperature_field:
+    reference: "Equation 53 in paper"
+    profile: "Piecewise linear"
+    regions:
+      inside_drop:
+        condition: "r ≤ R₀"
+        temperature: 0.0
+        description: "Saturation temperature"
+
+      far_field:
+        condition: "r ≥ R_inf"
+        temperature: 1.0
+        description: "Free-stream temperature"
+        R_inf: 0.625
+        note: "R_inf = 1.25 × R₀"
+
+      transition_region:
+        condition: "R₀ < r < R_inf"
+        temperature: "(r - R₀)/(R_inf - R₀)"
+        description: "Linear interpolation"
+
+    equation: |
+      T*(r) = {
+        0,                           r ≤ R₀
+        (r - R₀)/(R_inf - R₀),      R₀ < r < R_inf
+        1,                           r ≥ R_inf
+      }
+
+    notes:
+      - "Smooths temperature gradient near interface"
+      - "Prevents numerical instabilities"
+      - "Based on Eq. (53) in reference paper"
+
+# ==============================================================================
+# PHYSICAL PROPERTIES (DIMENSIONAL VALUES)
+# ==============================================================================
+
+dimensional_properties:
+
+  liquid_water:
+    density: 958.4  # kg/m³
+    dynamic_viscosity: 2.8e-4  # Pa·s
+    thermal_conductivity: 0.679  # W/(m·K)
+    specific_heat: 4216.0  # J/(kg·K)
+    description: "Water at saturation temperature (373.15 K)"
+
+  gas_steam:
+    density: 0.597  # kg/m³
+    dynamic_viscosity: 1.26e-5  # Pa·s
+    thermal_conductivity: 0.025  # W/(m·K)
+    specific_heat: 2030.0  # J/(kg·K)
+    description: "Steam at free-stream temperature (600 K)"
+
+  interface:
+    surface_tension: 0.0728  # N/m
+    latent_heat: 2.26e6  # J/kg
+    saturation_temperature: 373.15  # K
+    freestream_temperature: 600.0  # K
+    temperature_difference: 226.85  # K
+
+# ==============================================================================
+# NUMERICAL METHODS
+# ==============================================================================
+
+numerical_methods:
+
+  spatial_discretization:
+    grid_type: "Quadtree (adaptive)"
+    base_level: 6
+    max_level: 12
+    min_cell_size: "D₀/512"
+    description: "Wavelet-based adaptive mesh refinement"
+
+  refinement_criteria:
+    vof_criterion:
+      field: "f (volume fraction)"
+      threshold: 0.01
+      description: "Refine at interface"
+
+    velocity_criterion:
+      field: "u (velocity components)"
+      threshold: 0.01
+      description: "Refine in high-velocity gradients"
+
+    temperature_criterion:
+      field: "T (temperature)"
+      threshold: 0.02
+      description: "Refine in thermal boundary layer"
+
+  time_integration:
+    scheme: "Implicit-explicit (IMEX)"
+    cfl_number: 0.2
+    description: "Adaptive time-stepping"
+    notes:
+      - "Implicit for viscous terms"
+      - "Explicit for advection"
+      - "Pressure-velocity coupling via projection method"
+
+  vof_solver:
+    method: "Geometrical VOF"
+    interface_reconstruction: "Piecewise linear (PLIC)"
+    advection_scheme: "Direction-split"
+
+  pressure_solver:
+    method: "Multigrid"
+    tolerance: 1.0e-6
+    max_iterations: 100
+
+  diffusion_solver:
+    method: "Implicit Crank-Nicolson"
+    description: "Second-order accurate in time"
+
+# ==============================================================================
+# OUTPUT AND DIAGNOSTICS
+# ==============================================================================
+
+diagnostics:
+
+  time_scales:
+    solver_time:
+      symbol: "t⁺"
+      definition: "t⁺ = t U∞ / D₀"
+      description: "Convective time scale"
+
+    paper_time:
+      symbol: "t*"
+      definition: "t* = t⁺ √(ρ_l/ρ_g)"
+      description: "Time scale used in paper"
+      conversion: "t* = t (U∞/D₀) √(ρ_l/ρ_g)"
+
+  primary_outputs:
+
+    drop_volume:
+      variable: "V(t)"
+      equation: "V = ∫∫∫ f dV"
+      normalization: "V/V₀"
+      V0: "4πR₀³/3"
+      description: "Tracks drop shrinkage due to evaporation"
+
+    vaporization_rate:
+      variable: "dV/dt"
+      equation: "-dV/dt = ∫∫ ṁ dA / ρ_l"
+      description: "Rate of volume loss"
+
+    nusselt_number:
+      variable: "Nu"
+      equation: "Nu = q D₀ / (k_g ΔT)"
+      heat_flux: "q = ∫∫ k |∇T|_interface dA / A_drop"
+      description: "Dimensionless heat transfer coefficient"
+
+    frontal_area:
+      variable: "A_frontal"
+      description: "Projected area in flow direction"
+
+  output_files:
+    volume_history:
+      filename: "volume_history.txt"
+      columns: ["t⁺", "t*", "Volume", "V/V₀", "dV/dt"]
+
+    snapshots:
+      format: "VTK"
+      frequency: "Every 50 timesteps"
+      fields: ["f", "u", "p", "T"]
+
+    dump_files:
+      format: "Basilisk binary"
+      frequency: "Every 0.05 time units"
+      description: "Full restart capability"
+
+# ==============================================================================
+# PARAMETER SWEEP
+# ==============================================================================
+
+parameter_sweep:
+  independent_variable:
+    name: "Reynolds number"
+    symbol: "Re"
+    range: [22, 200]
+    num_cases: 25
+    spacing: "Linear"
+
+  fixed_parameters:
+    weber: 1.5
+    stefan: 0.1
+    prandtl: 1.0
+
+  derived_parameters:
+    mu_g_star:
+      equation: "μ_g* = η / Re"
+      description: "Gas viscosity from Reynolds number"
+
+    mu_l_star:
+      equation: "μ_l* = μ_g* / μ_ratio"
+      description: "Liquid viscosity from viscosity ratio"
+
+  simulation_time:
+    t_end: 0.16
+    unit: "t* (paper time)"
+    description: "Stop when t* = 0.16"
+
+# ==============================================================================
+# VALIDATION METRICS
+# ==============================================================================
+
+validation:
+
+  compare_against:
+    - "Figure 10 in Boyd & Ling 2023"
+    - "Drop shape evolution"
+    - "Temperature contours"
+    - "Volume evolution curves"
+
+  expected_behavior:
+    - "Drop shrinks due to evaporation"
+    - "Higher Re → faster evaporation"
+    - "Thermal boundary layer develops"
+    - "Interface remains relatively spherical"
+
+  empirical_correlations:
+    nusselt_ranz_marshall:
+      equation: "Nu = 2 + 0.6 Re^(1/2) Pr^(1/3)"
+      description: "Ranz-Marshall correlation for spheres"
+      applicability: "Valid for moderate Re"
+
+# ==============================================================================
+# IMPLEMENTATION NOTES
+# ==============================================================================
+
+implementation:
+
+  software: "Basilisk C"
+  solver_type: "Finite volume, octree AMR"
+
+  key_modules:
+    - "axi.h - Axisymmetric geometry"
+    - "navier-stokes/centered.h - NS solver"
+    - "two-phase.h - Density/viscosity jumps"
+    - "tension.h - Surface tension"
+    - "tracer.h - Temperature advection"
+    - "diffusion.h - Heat conduction"
+
+  compilation:
+    command: "qcc -O2 -Wall -o solver solver.c -lm"
+    environment: "BASILISK=/path/to/basilisk/src"
+
+  runtime:
+    typical_time: "2-6 hours per case (Re-dependent)"
+    memory_usage: "~2-8 GB (depending on Lmax)"
+    parallelization: "OpenMP/MPI supported"
+
+# ==============================================================================
+# REFERENCES
+# ==============================================================================
+
+references:
+  primary:
+    authors: "Boyd & Ling"
+    year: 2023
+    journal: "Computers and Fluids"
+    title: "Numerical simulation of evaporating droplets"
+    equations: [51, 52, 53]
+    figure: 10
+
+  related:
+    - "Basilisk: http://basilisk.fr"
+    - "Ranz-Marshall correlation (1952)"
+    - "Stefan problem (classical reference)"
