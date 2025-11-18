@@ -10,8 +10,10 @@ Section 4.3 of [Boyd et al, 2023](#boyd_consistent_2023).
 
 */
 
-/** 
+/**
 ### 3D test (alternatively could be 2D axi)
+For 3D simulations: Use grid/octree.h (current configuration)
+For 2D axisymmetric: Uncomment #define AXI and use grid/multigrid.h instead
 */
 //#define AXI 0
 #include "grid/octree.h"
@@ -181,7 +183,7 @@ event progress(i++) { progress_check(i, t, T_END); }
 */
 #include "view.h"
 #include "../src/post_processing/movie_maker.h"
-event moive_output(t += DELTA_T) {
+event movie_output(t += DELTA_T) {
   scalar temperature[];
   foreach () {
     temperature[] = f[] * T_L[] + (1. - f[]) * T_V[];

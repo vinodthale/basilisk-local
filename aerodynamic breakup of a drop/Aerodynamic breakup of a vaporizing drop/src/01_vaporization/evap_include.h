@@ -77,6 +77,13 @@ int MAX_LEVEL = 6;
 #include "utils.h"
 
 #include "tag.h"
+
+// IMPORTANT: Include order matters for axisymmetric simulations with conserving method
+// The standard Basilisk pattern is:
+// 1. axi.h (if AXI is defined)
+// 2. centered solver (centered_evap.h - custom for phase change)
+// 3. two-phase (two-phase-evap.h - custom for phase change)
+// 4. conserving.h (for momentum conservation)
 #if AXI
 #include "axi.h"
 #endif // AXI
