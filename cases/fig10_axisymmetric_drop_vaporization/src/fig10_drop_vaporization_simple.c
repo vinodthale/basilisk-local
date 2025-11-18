@@ -3,11 +3,12 @@
  * @brief Simplified axisymmetric drop vaporization (for testing)
  */
 
-#include "grid/multigrid.h"
-#include "axi.h"
-#include "navier-stokes/centered.h"
-#include "two-phase.h"
-#include "tension.h"
+// Author: Vinod Thale (corrected header structure for axisymmetric simulation)
+#include "axi.h"                       // Axisymmetric geometry (handles grid internally)
+#include "navier-stokes/centered.h"    // Two-phase Navier-Stokes solver
+#define FILTERED                       // Smear density and viscosity jumps
+#include "two-phase.h"                 // Density and viscosity for two phases
+#include "tension.h"                   // Surface tension
 
 // Dimensionless numbers
 double REYNOLDS = 100.0;
