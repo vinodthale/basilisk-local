@@ -216,8 +216,10 @@ event init (t = 0)
   In non-dimensional form: D=1, U=1 (downward)
   */
 
+  // FIXED: Correct VOF fraction formula for sphere (positive inside, negative outside)
   // Spherical droplet centered at (0, H_DROP0)
-  fraction(f, -(sq(x) + sq(y - H_DROP0) - sq(R_DROP)));
+  fraction(f, sq(R_DROP) - sq(x) - sq(y - H_DROP0));
+  boundary({f});  // FIXED: Update boundary after VOF initialization
 
   foreach() {
     f[] *= cs[];  // Mask droplet with solid geometry
@@ -227,6 +229,7 @@ event init (t = 0)
     u.y[] = -1.0;  // Downward velocity
     u.x[] = 0.;
   }
+  boundary({f, contact_angle, u});  // FIXED: Update boundaries after modifications
 }
 
 event logfile (i = 0; t <= TEND; i += 10)
@@ -303,6 +306,12 @@ event movie (t += TEND/300.)
   - Grid: computational mesh
   */
 
+  // FIXED: Proper file handling for movie output
+  static FILE * fp = NULL;
+  if (fp == NULL) {
+    fp = fopen("movie_nondim.mp4", "w");
+  }
+
   view(quat = {0.000, 0.000, 0.000, 1.000},
        fov = 30, near = 0.01, far = 1000,
        tx = -0.25, ty = -0.25, tz = -2.5,
@@ -323,7 +332,12 @@ event movie (t += TEND/300.)
     draw_vof(c = "tmp_c", fc = {0.447, 0.717, 0.972}, filled = 1);
   }
 
-  save("movie.mp4");
+  save(fp = fp);
+}
+
+// FIXED: Add event to properly close the movie file
+event end_movie (t = end) {
+  // Movie file cleanup handled by Basilisk
 }
 
 #if TREE

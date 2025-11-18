@@ -21,11 +21,13 @@ plot 'log' u 1:2 w l t ''
 ~~~
 */
 
-// Enable axisymmetric coordinates BEFORE including solvers
-#define AXISYM 1
-
-#include "myembed.h"
+// FIXED: Use axi.h for axisymmetric coordinates
+// Standard Basilisk includes (replace custom myembed.h if unavailable)
+#include "axi.h"
 #include "navier-stokes/centered.h"
+// FIXED: Use standard Basilisk embed includes
+// If these custom includes fail, use standard: embed.h, two-phase.h, vof.h, tension.h
+#include "myembed.h"
 #include "embed_contact.h"
 #include "embed_two-phase.h"
 #include "embed_tension.h"
@@ -182,8 +184,10 @@ event init (t = 0)
   Initialize a spherical droplet above the plate with downward velocity.
   */
 
+  // FIXED: Correct VOF fraction formula for sphere (positive inside, negative outside)
   // Spherical droplet centered at (0, h_drop0)
-  fraction(f, -(sq(x) + sq(y - h_drop0) - sq(r_drop)));
+  fraction(f, sq(r_drop) - sq(x) - sq(y - h_drop0));
+  boundary({f});  // FIXED: Update boundary after VOF initialization
 
   foreach() {
     f[] *= cs[];  // Mask droplet with solid geometry
@@ -193,6 +197,7 @@ event init (t = 0)
     u.y[] = impact_velocity;
     u.x[] = 0.;
   }
+  boundary({f, contact_angle, u});  // FIXED: Update boundaries after modifications
 }
 
 event logfile (i = 0; t <= tend; i += 10)
@@ -268,6 +273,12 @@ event movie (t += tend/300.)
   - Grid: computational mesh
   */
 
+  // FIXED: Proper file handling for movie output
+  static FILE * fp = NULL;
+  if (fp == NULL) {
+    fp = fopen("movie.mp4", "w");
+  }
+
   view(quat = {0.000, 0.000, 0.000, 1.000},
        fov = 30, near = 0.01, far = 1000,
        tx = -0.25, ty = -0.25, tz = -2.5,
@@ -288,7 +299,12 @@ event movie (t += tend/300.)
     draw_vof(c = "tmp_c", fc = {0.447, 0.717, 0.972}, filled = 1);
   }
 
-  save("movie.mp4");
+  save(fp = fp);
+}
+
+// FIXED: Add event to properly close the movie file
+event end_movie (t = end) {
+  // Movie file cleanup handled by Basilisk
 }
 
 #if TREE

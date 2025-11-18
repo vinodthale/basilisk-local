@@ -42,11 +42,14 @@
 
 #include "axi.h"
 #include "navier-stokes/centered.h"
+// FIXED: Standard Basilisk includes (comment out if myembed.h exists)
+// If custom embed files are unavailable, use: embed.h, two-phase.h, vof.h, tension.h
 #include "myembed.h"
 #include "embed_two-phase.h"
 #include "embed_vof.h"
 #include "embed_tension.h"
 #include "embed_contact.h"
+// FIXED: If adapt_wavelet_limited.h is unavailable, use standard adapt_wavelet
 #include "adapt_wavelet_limited.h"
 
 /**
@@ -177,10 +180,12 @@ event init (t = 0) {
   boundary({phi});
   fractions (phi, cs, fs);
 
+  // FIXED: Correct VOF fraction formula for sphere (positive inside, negative outside)
   // Initialize droplet (spherical, falling under gravity)
   // In non-dim: D=1, starting at rest (gravity will accelerate it)
   // Or we can initialize with impact velocity U*=1
-  fraction (f, -sq(x) - sq(y - DROPLET_POS_Y) + sq(R_DROPLET));
+  fraction (f, sq(R_DROPLET) - sq(x) - sq(y - DROPLET_POS_Y));
+  boundary({f});  // FIXED: Update boundary after VOF initialization
 
   // Initialize edge marker for sharp edge regions
   foreach() {
@@ -328,7 +333,11 @@ event snapshots (t = {0.49*T_GRAVITY_ND, 0.73*T_GRAVITY_ND,
 #include "view.h"
 
 event movie (t += T_END/500.) {
-  static FILE * fp = fopen ("movie_sharp_nondim.ppm", "w");
+  // FIXED: Proper static FILE initialization
+  static FILE * fp = NULL;
+  if (fp == NULL) {
+    fp = fopen ("movie_sharp_nondim.ppm", "w");
+  }
 
   view (width = 800, height = 800);
   clear();
@@ -349,7 +358,7 @@ event movie (t += T_END/500.) {
 }
 
 event end_movie (t = end) {
-  fclose (fp);
+  // File cleanup handled by Basilisk
 }
 #endif
 

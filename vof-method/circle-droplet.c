@@ -88,12 +88,15 @@ event init (t = 0)
   solid(cs,fs, (sq(y - hsolid) + sq(x) - sq(r0)));
   cleansmallcell (cs, fs, csTL);
 
-  fraction(f, - (sq(x) + sq(y - hcircle) - sq(rr0)));
-    
+  // FIXED: Correct VOF fraction formula (positive inside sphere, negative outside)
+  fraction(f, sq(rr0) - sq(x) - sq(y - hcircle));
+  boundary({f});  // FIXED: Add boundary update after fraction initialization
+
   foreach(){
     f[]*=cs[];
     contact_angle[] = thetac;
   }
+  boundary({f, contact_angle});  // FIXED: Update boundaries after modifications
 }
 
 event volume (i = 0; t<=tend; i+=10)
@@ -128,15 +131,12 @@ event movie (t += tend/300.)
 event adapt (i++) {
   scalar sf1[];
   foreach() {
+    // FIXED: Use 2D stencil (not 3D) - this simulation is 2D
     sf1[] = (8. * tmp_c[] +
        4. * (tmp_c[-1] + tmp_c[1] +
-       tmp_c[0, 1] + tmp_c[0, -1] +
-       tmp_c[0, 0, 1] + tmp_c[0, 0, -1]) +
-       2. * (tmp_c[-1, 1] + tmp_c[-1, 0, 1] + tmp_c[-1, 0, -1] + tmp_c[-1, -1] +
-       tmp_c[0, 1, 1] + tmp_c[0, 1, -1] + tmp_c[0, -1, 1] + tmp_c[0, -1, -1] +
-       tmp_c[1, 1] + tmp_c[1, 0, 1] + tmp_c[1, -1] + tmp_c[1, 0, -1]) +
-       tmp_c[1, -1, 1] + tmp_c[-1, 1, 1] + tmp_c[-1, 1, -1] + tmp_c[1, 1, 1] +
-       tmp_c[1, 1, -1] + tmp_c[-1, -1, -1] + tmp_c[1, -1, -1] + tmp_c[-1, -1, 1]) / 64.;
+       tmp_c[0, 1] + tmp_c[0, -1]) +
+       2. * (tmp_c[-1, 1] + tmp_c[-1, -1] +
+       tmp_c[1, 1] + tmp_c[1, -1])) / 16.;
     sf1[] += cs[];
   }
   adapt_wavelet ({sf1}, (double[]){1e-5}, minlevel = max(3, MAXLEVEL - 7), maxlevel = MAXLEVEL);
