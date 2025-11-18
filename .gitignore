@@ -1,12 +1,19 @@
 # Basilisk build artifacts
 src/*.o
 src/**/*.o
+*.o
 src/*.a
 src/**/*.a
 src/qcc
 src/config
 src/Makefile.deps
 src/Makefile.tests
+src/bview2D
+src/bview2Dm
+src/bview3D
+src/*.tags
+src/kdtquery
+src/xyz2kdt
 
 # Specific build directories and files
 src/ast/grammar
