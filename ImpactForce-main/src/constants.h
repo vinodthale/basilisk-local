@@ -4,7 +4,7 @@
 // Later functionalities added by Vinod Ashok Thale and Professor Marie-Jean THORAVAL 
 #include "axi.h"                       // axisymmetric geometry
 #include "navier-stokes/centered.h"    // solve NS equations
-#define FILTERED                       // Smear density and viscosity jumps
+#define FILTERED 1                     // Smear density and viscosity jumps
 #include "two-phase.h"                 // Solve two -phase eqaution 
 #include "tension.h"                   // include surface tension between phases
 #include "tag.h"                       // help to count small droplets we can count its geometric mass, volume, area ...... etc

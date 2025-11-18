@@ -52,7 +52,7 @@
 // Axisymmetric geometry
 #include "axi.h"
 #include "navier-stokes/centered.h"
-#define FILTERED
+#define FILTERED 1
 #include "two-phase.h"
 #include "tension.h"
 #include "tracer.h"

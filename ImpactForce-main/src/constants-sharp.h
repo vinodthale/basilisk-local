@@ -5,15 +5,15 @@
 // Later functionalities added by Vinod Ashok Thale and Professor Marie-Jean THORAVAL
 
 // IMPORTANT: Include sharp VOF headers in correct order
-#include "../2D-sharp-and-conservative-VOF-method-Basiliks-main/axi.h"  // Custom axisymmetric with embed support
+#include "../vof-method/axi.h"  // Custom axisymmetric with embed support
 #include "navier-stokes/centered.h"    // solve NS equations
-#define FILTERED                       // Smear density and viscosity jumps
+#define FILTERED 1                     // Smear density and viscosity jumps
 
 // Sharp VOF method headers (MUST be in this order)
-#include "../2D-sharp-and-conservative-VOF-method-Basiliks-main/myembed.h"              // Custom embed boundaries
-#include "../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_contact.h"       // Contact line dynamics
-#include "../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_two-phase.h"     // Two-phase flow
-#include "../2D-sharp-and-conservative-VOF-method-Basiliks-main/embed_tension.h"       // Surface tension
+#include "../vof-method/myembed.h"              // Custom embed boundaries
+#include "../vof-method/embed_contact.h"       // Contact line dynamics
+#include "../vof-method/embed_two-phase.h"     // Two-phase flow
+#include "../vof-method/embed_tension.h"       // Surface tension
 
 #include "tag.h"                       // help to count small droplets we can count its geometric mass, volume, area ...... etc
 #include "curvature.h"
