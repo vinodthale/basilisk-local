@@ -1,11 +1,23 @@
 
-// Author: Vinod Thale  15 sep 2023 
-// Basic framework  is developed by Hossain Chizari 
-// Later functionalities added by Vinod Ashok Thale and Professor Marie-Jean THORAVAL 
-#include "axi.h"                       // axisymmetric geometry
+// Author: Vinod Thale  15 sep 2023
+// Basic framework  is developed by Hossain Chizari
+// Later functionalities added by Vinod Ashok Thale and Professor Marie-Jean THORAVAL
+
+// IMPORTANT: This code requires dimension = 2
+// Compile with: qcc -dimension=2 -DAXI=0 Bdropimpact.c  (for 2D Cartesian)
+//          or: qcc -dimension=2 -DAXI=1 Bdropimpact.c  (for Axisymmetric)
+#if dimension != 2
+  #error "This code requires dimension = 2. Compile with -dimension=2 flag"
+#endif
+
+// Only include axi.h for axisymmetric mode
+#if AXI
+  #include "axi.h"                     // axisymmetric geometry (cylindrical coordinates)
+#endif
+
 #include "navier-stokes/centered.h"    // solve NS equations
 #define FILTERED 1                     // Smear density and viscosity jumps
-#include "two-phase.h"                 // Solve two -phase eqaution 
+#include "two-phase.h"                 // Solve two-phase equation
 #include "tension.h"                   // include surface tension between phases
 #include "tag.h"                       // help to count small droplets we can count its geometric mass, volume, area ...... etc
 #include "curvature.h"
