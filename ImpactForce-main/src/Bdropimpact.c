@@ -5,14 +5,29 @@ double drop_time_total, bubble_time_total, writefile_time_total, simulation_time
 clock_t simulation_str_time, simulation_end_time;
 
 struct CFDValues cfdbv;
+
 // Boundary conditions
- u.t[left] = dirichlet(0);  // No slip at surface
- f[left] = 0.;    // non wetting  
- u.n[right] = neumann(0);   // Free flow condition
- p[right] = dirichlet(0);   // 0 pressure far from surface
- u.n[top] = neumann(0);     // Allows outflow through boundary
- p[top] = dirichlet(0);     // 0 pressure far from surface
-// Default for bottom is symmetry
+#if AXI
+	// Axisymmetric mode: left boundary is r=0 (symmetry axis)
+	u.n[left] = dirichlet(0);    // No radial flow through axis
+	u.t[left] = dirichlet(0);    // No tangential velocity at axis
+	// VOF field f symmetry is handled by axi.h automatically
+#else
+	// 2D Cartesian mode: left boundary is solid wall
+	u.n[left] = dirichlet(0);    // No penetration at wall
+	u.t[left] = dirichlet(0);    // No slip at wall
+	f[left] = 0.;                // Non-wetting wall
+#endif
+
+// Right boundary: far field (same for both modes)
+u.n[right] = neumann(0);   // Free flow condition
+p[right] = dirichlet(0);   // 0 pressure far from surface
+
+// Top boundary: far field or outflow (same for both modes)
+u.n[top] = neumann(0);     // Allows outflow through boundary
+p[top] = dirichlet(0);     // 0 pressure far from surface
+
+// Bottom boundary: default is symmetry (appropriate for both modes)
 int main(int argc, char **argv)
 {
 	simulation_str_time = clock();
@@ -21,12 +36,17 @@ int main(int argc, char **argv)
 	drop_time_1file = 0.0;
 	bubble_time_1file = 0.0;
 	numericalmainvalues(argv, argc, &cfdbv);
-	;
+
 	size(cfdbv.domainsize);
 #if AXI
+	// Axisymmetric: r ∈ [0, L], z ∈ [0, L]
+	// Default origin (0, 0) places r=0 at left boundary - CORRECT
+	// Do not change origin for axisymmetric!
 	;
 #else
-	origin(0, -cfdbv.domainsize / 2., -cfdbv.domainsize / 2.);
+	// 2D Cartesian: x ∈ [0, L], y ∈ [-L/2, L/2]
+	// Center the domain in y-direction
+	origin(0, -cfdbv.domainsize / 2.);
 #endif
 	int initialgrid = pow(2, LEVELmin);
 	init_grid(initialgrid);
@@ -50,11 +70,19 @@ event defaults(i = 0)
 	interfaces = list_add(interfaces,fb); 
 }
 
- event initfraction (t = 0)
+event initfraction (t = 0)
 {
-  double x0 = cfdbv.pooldepth + cfdbv.initialdis + cfdbv.diameter*0.50;// This is center drop centre
-  double Bubtx0 = cfdbv.pooldepth + cfdbv.initialdis + cfdbv.diameter*0.50;  //  This is center of Bubble
-  fraction(f,(min(sq(0.50*cfdbv.diameter)-(sq(x - x0) + sq(y) + sq(z)),-(sq(0.50*(cfdbv.bubblediameter*cfdbv.diameter))-(sq(x - Bubtx0) + sq(y) + sq(z))))));  
+	double x0 = cfdbv.pooldepth + cfdbv.initialdis + cfdbv.diameter*0.50;    // Drop center position
+	double Bubtx0 = cfdbv.pooldepth + cfdbv.initialdis + cfdbv.diameter*0.50; // Bubble center position
+
+	// Both 2D Cartesian and Axisymmetric use: sq(x - x0) + sq(y - y0) < R²
+	// - Axisymmetric: (x,y)=(r,z), revolution around x-axis creates 3D sphere
+	// - 2D Cartesian: (x,y)=(x,y), creates 2D circle
+	// NOTE: In 2D, there is NO z coordinate! Original code with sq(z) was incorrect.
+	fraction(f,(min(
+		sq(0.50*cfdbv.diameter)-(sq(x - x0) + sq(y)),
+		-(sq(0.50*(cfdbv.bubblediameter*cfdbv.diameter))-(sq(x - Bubtx0) + sq(y)))
+	)));
 }
 
 event init(i = 0)
@@ -68,25 +96,38 @@ event init(i = 0)
 	}
 	else
 	{
-		double x0 = cfdbv.pooldepth + cfdbv.initialdis + cfdbv.diameter*0.50; // This is drop center 
-		double Bubtx0 = cfdbv.pooldepth + cfdbv.initialdis + cfdbv.diameter*0.50;  //  This is center of Bubble
-		;
-		refine(sq(x - x0) + sq(y) + sq(z) < sq(0.50*cfdbv.diameter + cfdbv.refinegap) && sq(x - x0) + sq(y) + sq(z) > sq(0.50*cfdbv.diameter - cfdbv.refinegap) && level < LEVELmax); // refinement along Dorp 
-		refine(sq(x - Bubtx0) + sq(y) + sq(z) < sq(0.50*(cfdbv.bubblediameter * cfdbv.diameter) + cfdbv.refinegap) && sq(x - Bubtx0) + sq(y) + sq(z) > sq(0.50*(cfdbv.bubblediameter*cfdbv.diameter) - cfdbv.refinegap) && level < LEVELmax);  // This is refinemet along Bubble
+		double x0 = cfdbv.pooldepth + cfdbv.initialdis + cfdbv.diameter*0.50;    // Drop center position
+		double Bubtx0 = cfdbv.pooldepth + cfdbv.initialdis + cfdbv.diameter*0.50; // Bubble center position
+
+		// Refinement along drop interface
+		// Both modes use same formula: sq(x - x0) + sq(y) < R² (no sq(z) in 2D!)
+		refine(sq(x - x0) + sq(y) < sq(0.50*cfdbv.diameter + cfdbv.refinegap)
+			&& sq(x - x0) + sq(y) > sq(0.50*cfdbv.diameter - cfdbv.refinegap)
+			&& level < LEVELmax);
+
+		// Refinement along bubble interface
+		refine(sq(x - Bubtx0) + sq(y) < sq(0.50*(cfdbv.bubblediameter * cfdbv.diameter) + cfdbv.refinegap)
+			&& sq(x - Bubtx0) + sq(y) > sq(0.50*(cfdbv.bubblediameter*cfdbv.diameter) - cfdbv.refinegap)
+			&& level < LEVELmax);
+
 		foreach ()
 		{
-      f[] = 0.0;
-		  if(sq(x - x0) + sq(y) + sq(z) < sq(0.50*cfdbv.diameter))  // this is inside the Drop 
+			f[] = 0.0;
+
+			// Initialize drop: both modes use sq(x - x0) + sq(y) < R²
+			if(sq(x - x0) + sq(y) < sq(0.50*cfdbv.diameter))
 			{
-        f[] = 1.0;
-        u.x[] = -cfdbv.vel;
-        u.y[] = 0.0;
+				f[] = 1.0;
+				u.x[] = -cfdbv.vel;
+				u.y[] = 0.0;
 			}
-      if(sq(x - Bubtx0) + sq(y) + sq(z) < sq(0.50*(cfdbv.bubblediameter * cfdbv.diameter))) // this for the Inside the bubble 
+
+			// Initialize bubble: both modes use sq(x - x0) + sq(y) < R²
+			if(sq(x - Bubtx0) + sq(y) < sq(0.50*(cfdbv.bubblediameter * cfdbv.diameter)))
 			{
-				f[] = 0.0;  
-        u.x[] = -cfdbv.vel;
-        u.y[] = 0.0;
+				f[] = 0.0;
+				u.x[] = -cfdbv.vel;
+				u.y[] = 0.0;
 			}
 		};
 		clock_t timestr, timeend;

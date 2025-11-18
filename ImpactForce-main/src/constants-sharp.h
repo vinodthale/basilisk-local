@@ -4,8 +4,19 @@
 // Basic framework  is developed by Hossain Chizari
 // Later functionalities added by Vinod Ashok Thale and Professor Marie-Jean THORAVAL
 
+// IMPORTANT: This code requires dimension = 2
+// Compile with: qcc -dimension=2 -DAXI=0 Bdropimpact-sharp.c  (for 2D Cartesian)
+//          or: qcc -dimension=2 -DAXI=1 Bdropimpact-sharp.c  (for Axisymmetric)
+#if dimension != 2
+  #error "This code requires dimension = 2. Compile with -dimension=2 flag"
+#endif
+
 // IMPORTANT: Include sharp VOF headers in correct order
-#include "../vof-method/axi.h"  // Custom axisymmetric with embed support
+// Only include axi.h for axisymmetric mode
+#if AXI
+  #include "../vof-method/axi.h"       // Custom axisymmetric with embed support
+#endif
+
 #include "navier-stokes/centered.h"    // solve NS equations
 #define FILTERED 1                     // Smear density and viscosity jumps
 
