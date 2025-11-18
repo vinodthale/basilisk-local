@@ -11,7 +11,7 @@
 
 #include "axi.h"                       // axisymmetric geometry
 #include "navier-stokes/centered.h"    // solve NS equations
-#define FILTERED                       // Smear density and viscosity jumps
+#define FILTERED 1                     // Smear density and viscosity jumps
 #include "two-phase.h"                 // Solve two-phase equation
 #include "tension.h"                   // include surface tension between phases
 #include "tracer.h"                    // For temperature field

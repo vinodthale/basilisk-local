@@ -47,7 +47,7 @@ double DIFFUSION_TOL = 1.0e-3;
 double time_factor = 1.0e3;
 
 // increase projection stability - not required
-#define FILTERED
+#define FILTERED 1
 
 // default refinement levels
 int MIN_LEVEL = 6;

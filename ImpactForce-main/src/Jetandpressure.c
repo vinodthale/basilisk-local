@@ -1,6 +1,6 @@
 #include "axi.h"
 #include "navier-stokes/centered.h"
-#define FILTERED            // Smear density and viscosity jumps
+#define FILTERED 1          // Smear density and viscosity jumps
 #include "two-phase.h"
 #include "tension.h"
 #include "tag.h"
