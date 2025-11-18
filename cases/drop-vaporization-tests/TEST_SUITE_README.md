@@ -1,12 +1,16 @@
-# Axisymmetric Drop Vaporization Test Suite
+# Drop Vaporization Test Suite
 
 ## Overview
 
-This test suite provides a complete, fully nondimensional implementation of axisymmetric drop vaporization with phase change, reproducing **Figure 10** from Boyd & Ling 2023 (Computers and Fluids).
+This test suite provides comprehensive implementations of drop vaporization with phase change, including:
+
+1. **Axisymmetric Drop Vaporization** - Reproducing **Figure 10** from Boyd & Ling 2023 (Computers and Fluids)
+2. **Aerodynamic Breakup with Vaporization** - Advanced test cases for drops undergoing aerodynamic breakup while vaporizing
 
 The test suite includes:
 - **YAML equation specification** (`equations.yaml`) - Machine-readable format of all governing equations
-- **Complete solver** (`drop_vaporization_nondim.c`) - Full 2D axisymmetric solver based on ImpactForce-main structure
+- **Complete solvers** - Full 2D axisymmetric solvers based on ImpactForce-main structure
+- **Aerodynamic breakup tests** - Stefan problem, bubble growth, film boiling, and sucking problem
 - **Constants header** (`constants_vaporization.h`) - Nondimensional parameters and configuration
 - **Test scripts** - Compilation and parameter sweep automation
 
@@ -40,7 +44,7 @@ The solver follows the proven architecture from `ImpactForce-main/Bdropimpact.c`
 ## File Structure
 
 ```
-cases/fig10_axisymmetric_drop_vaporization/
+cases/drop-vaporization-tests/
 ├── equations.yaml                          # Complete equation specification
 ├── TEST_SUITE_README.md                    # This file
 ├── README.md                               # User documentation
@@ -50,12 +54,30 @@ cases/fig10_axisymmetric_drop_vaporization/
 │   ├── constants_vaporization.h            # Constants and configuration
 │   ├── fig10_drop_vaporization.c          # Alternative version
 │   ├── fig10_drop_vaporization_v2.c       # Development version
-│   └── drop_vap.c                         # Simple test version
+│   ├── drop_vap.c                         # Simple test version
+│   ├── bubble_growth.c                    # Aerodynamic breakup: bubble growth test
+│   ├── stefan_problem.c                   # Aerodynamic breakup: Stefan problem
+│   ├── film_boiling.c                     # Aerodynamic breakup: film boiling test
+│   ├── sucking_problem.c                  # Aerodynamic breakup: sucking problem
+│   ├── aerodynamic_breakup_Makefile.txt   # Makefile for aerodynamic breakup tests
+│   └── aerodynamic-breakup-headers/       # Headers for aerodynamic breakup tests
+│       ├── 01_vaporization/               # Vaporization models and functions
+│       ├── common_functions/              # Common utility functions
+│       ├── outputs/                       # Output and logging functions
+│       ├── properties/                    # Material properties
+│       ├── LS_funcs/                      # Level set functions
+│       ├── post_processing/               # Post-processing utilities
+│       └── theory_evap/                   # Theoretical evaporation models
 ├── scripts/
 │   ├── compile.sh                         # Compilation script
 │   ├── run_single_test.sh                 # Run one case
 │   ├── run_parameter_sweep.sh             # Run all 25 cases
 │   └── visualize_results.py               # Visualization
+├── docs/
+│   └── aerodynamic-breakup/               # Aerodynamic breakup documentation
+│       ├── README.md                      # Aerodynamic breakup overview
+│       ├── A consistent volume-of-fluid approach...pdf  # Reference paper
+│       └── images/                        # Documentation images
 ├── build/                                  # Build directory (created on compile)
 └── results/                                # Results directory (created on run)
 ```
@@ -134,6 +156,38 @@ Provides:
 - Command-line argument parsing
 - Time calculation utilities
 - All based on ImpactForce-main pattern
+
+### Aerodynamic Breakup Tests
+
+Four test cases for validating vaporization models in complex flow scenarios:
+
+1. **`stefan_problem.c`**: Classic Stefan problem - 1D phase change with moving interface
+   - Validates basic evaporation physics
+   - Analytical solution available for comparison
+   - Tests temperature gradient computation at interface
+
+2. **`bubble_growth.c`**: Bubble growth in superheated liquid
+   - Tests mass transfer from liquid to vapor
+   - Spherically symmetric evaporation
+   - Validates pressure-temperature coupling
+
+3. **`film_boiling.c`**: Film boiling on hot surface
+   - Complex vapor layer formation
+   - Tests evaporation under high heat flux
+   - Relevant for droplet impact on hot surfaces
+
+4. **`sucking_problem.c`**: Interface with evaporative mass flux
+   - Tests velocity jump conditions across interface
+   - Validates momentum coupling with phase change
+   - Important for aerodynamic breakup scenarios
+
+These tests use the comprehensive header library in `src/aerodynamic-breakup-headers/` which includes:
+- Advanced vaporization models (`01_vaporization/`)
+- Temperature-phase change coupling (`temperature-phase-change.h`)
+- Interface tracking functions (`interface_functions.h`)
+- Material property correlations (`properties/`)
+
+See `docs/aerodynamic-breakup/README.md` for detailed documentation.
 
 ## Usage
 
@@ -401,10 +455,15 @@ grep "V/V0" ../results/Re_100.00_We_1.50/volume_history.txt
 
 ## References
 
-### Primary Reference
+### Primary References
 - **Boyd & Ling (2023)** - Computers and Fluids
-- Figure 10: Axisymmetric drop vaporization
-- Equations 51-53: Stefan condition and temperature profile
+  - Figure 10: Axisymmetric drop vaporization
+  - Equations 51-53: Stefan condition and temperature profile
+
+- **A consistent volume-of-fluid approach for direct numerical simulation of the aerodynamic breakup of a vaporizing drop**
+  - Aerodynamic breakup with vaporization methodology
+  - Advanced VOF techniques for phase change
+  - See `docs/aerodynamic-breakup/` for full paper
 
 ### Code References
 - **ImpactForce-main/Bdropimpact.c** - Base solver structure
@@ -428,6 +487,12 @@ For general Basilisk questions:
 - Mailing list: basilisk@basilisk.fr
 
 ## Version History
+
+- **2025-11-18**: Enhanced test suite with aerodynamic breakup cases
+  - Added aerodynamic breakup vaporization test cases
+  - Integrated Stefan problem, bubble growth, film boiling, and sucking problem
+  - Reorganized structure with comprehensive header library
+  - Added documentation for aerodynamic breakup tests
 
 - **2025-11-18**: Initial complete test suite
   - Full nondimensional solver
