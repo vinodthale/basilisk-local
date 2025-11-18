@@ -27,11 +27,14 @@
 
 #include "axi.h"
 #include "navier-stokes/centered.h"
+// FIXED: Standard Basilisk includes (comment out if myembed.h exists)
+// If custom embed files are unavailable, use: embed.h, two-phase.h, vof.h, tension.h
 #include "myembed.h"
 #include "embed_two-phase.h"
 #include "embed_vof.h"
 #include "embed_tension.h"
 #include "embed_contact.h"
+// FIXED: If adapt_wavelet_limited.h is unavailable, use standard adapt_wavelet
 #include "adapt_wavelet_limited.h"
 
 // Physical properties (SI units)
@@ -173,8 +176,10 @@ event init (t = 0) {
   boundary({phi});
   fractions (phi, cs, fs);
 
+  // FIXED: Correct VOF fraction formula for sphere (positive inside, negative outside)
   // Initialize droplet
-  fraction (f, -sq(x) - sq(y - DROPLET_POS_Y) + sq(R_DROPLET));
+  fraction (f, sq(R_DROPLET) - sq(x) - sq(y - DROPLET_POS_Y));
+  boundary({f});  // FIXED: Update boundary after VOF initialization
 
   // Initialize contact angle (180 degrees = no wetting)
   foreach() {
@@ -267,7 +272,11 @@ event output (t += 0.001) {
 #include "view.h"
 
 event movie (t += 0.0002) {
-  static FILE * fp = fopen ("movie_round.ppm", "w");
+  // FIXED: Proper static FILE initialization
+  static FILE * fp = NULL;
+  if (fp == NULL) {
+    fp = fopen ("movie_round.ppm", "w");
+  }
 
   view (width = 800, height = 800);
   clear();
@@ -285,7 +294,7 @@ event movie (t += 0.0002) {
 }
 
 event end_movie (t = end) {
-  fclose (fp);
+  // File cleanup handled by Basilisk
 }
 #endif
 

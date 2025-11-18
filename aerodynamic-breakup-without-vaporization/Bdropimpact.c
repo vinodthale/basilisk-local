@@ -116,16 +116,20 @@ int main(int argc, char *argv[]) {
 // Initialization: create initial droplet or restore from saved state
 // -----------------------------------------------------------------------------
 event init(t = 0) {
-  if (!restore(file = "dump")) {  
+  if (!restore(file = "dump")) {
     // Ellipsoidal droplet (VOF fraction) in x–y plane
     fraction(f, sq(HORIZONTAL_DIAMETER * 0.5) - (sq((x - (INITIALDISTANCE + HORIZONTAL_DIAMETER)) / HORIZONTAL_DIAMETER) + sq(y / VERTICAL_DIAMETER)));
+    boundary({f});  // FIXED: Update boundary values after VOF initialization
+
     // One-line refinement band around interface (2D axi: no z-term)
     refine((sq((x - (INITIALDISTANCE + HORIZONTAL_DIAMETER)) / HORIZONTAL_DIAMETER) + sq(y / VERTICAL_DIAMETER) < sq(0.5 * HORIZONTAL_DIAMETER + REFINEGAP)) && (sq((x - (INITIALDISTANCE + HORIZONTAL_DIAMETER)) / HORIZONTAL_DIAMETER) + sq(y / VERTICAL_DIAMETER) > sq(0.5 * HORIZONTAL_DIAMETER - REFINEGAP)) && level < maxlevel); // Refinement band
+
     // Start from rest
-        foreach() {
+    foreach() {
       u.x[] = 0.0;
       u.y[] = 0.0;
     }
+    boundary({u});  // FIXED: Update boundary values after velocity initialization
   } 
   else {
     fprintf(stderr, "Restarted from saved state.\n");
@@ -151,7 +155,7 @@ event energy_budgetDCB(i = 0; i++) {
   double ke1 = 0, ke2 = 0, ke = 0;
   double area = 0;// gpe = 0;
   double kn = 1.0;
-  double PreFactor = 2.0 * pi;
+  double PreFactor = 2.0 * R_PI;  // FIXED: Use R_PI (defined at line 64) instead of pi
   //reduction(+:gpe)
   foreach (reduction(+:ke1) reduction(+:ke2) reduction(+:ke) reduction(+:area) reduction(+:vd) reduction(+:VD)) {
     double ry = fabs(y) > 1e-10 ? y : 1e-10;
@@ -412,7 +416,8 @@ event quantify_gas_vorticity (i = 0; i++) {
       omega_min = min(omega_min, w);
 
       // Axisymmetric volume element: dv * 2π * y
-      double vol_axi = f[] * 2.0 * R_PI * dv();      // ∫ f dV (volume)
+      // FIXED: Use (1-f[]) for gas phase, not f[]
+      double vol_axi = (1.0 - f[]) * 2.0 * R_PI * dv();  // Gas phase volume
 
       omega_sum += w * vol_axi;           // For mean calculation
       omega_sq_sum += w * w * vol_axi;    // For RMS calculation

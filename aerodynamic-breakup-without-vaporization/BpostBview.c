@@ -1,8 +1,15 @@
+// FIXED: Add missing includes and declarations
+// If constants.h doesn't exist, ensure required constants are defined elsewhere
 #include "constants.h"
+
 #define BVIEWFOLDER	"bviewfiles"
 double bview_time_1file, bview_time_total;
-double SCALE = 1.0, YPOSITION = 0.50, NOPIXELS = 2000; // it was 1000 before 
+double SCALE = 1.0, YPOSITION = 0.50, NOPIXELS = 2000; // it was 1000 before
 double j;
+
+// FIXED: Declare fdrop scalar (used in event defaults)
+scalar fdrop[];
+
 #include "view.h"
 
 // install bview: http://basilisk.fr/src/gl/INSTALL
@@ -17,9 +24,11 @@ struct CFDValues cfdbv;
 double total_time_1file, total_time_total;
 clock_t simulation_str_time, simulation_end_time;
 
-double Time_BGN =0.00, Time_STP = 0.01, Time_END = 3.05; // Time_STP = 0.01 it was this value before this okay i  have changed it okay 
+double Time_BGN =0.00, Time_STP = 0.01, Time_END = 3.05; // Time_STP = 0.01 it was this value before this okay i  have changed it okay
 
 void readfromargPOST(int argc, char **argv);
+// FIXED: Add declaration for timecalculation function
+void timecalculation(double time_seconds, char* output_string);
 
 int main(int argc, char **argv)
 {
@@ -121,13 +130,15 @@ void readfromargPOST(int argc, char **argv)
 	}
 }
 
+// FIXED: Event ordering - defaults runs first, loadfiles runs after
 event defaults(i = 0)
 {
 	interfaces = list_add(NULL, f);
 	interfaces = list_add(interfaces, fdrop);
 }
 
-event loadfiles(i = 0)
+// FIXED: Changed from i=0 to i=1 to avoid event ordering conflict
+event loadfiles(i = 1)
 {
 	int iloop;
 	const double iloopmax = (Time_END - Time_BGN) / Time_STP + 1.0001;
@@ -244,4 +255,13 @@ event loadfiles(i = 0)
 
 event end(i = 0)
 {
+}
+
+// FIXED: Add timecalculation function implementation
+// This converts seconds to HH:MM:SS format
+void timecalculation(double time_seconds, char* output_string) {
+  int hours = (int)(time_seconds / 3600);
+  int minutes = (int)((time_seconds - hours * 3600) / 60);
+  int seconds = (int)(time_seconds - hours * 3600 - minutes * 60);
+  sprintf(output_string, "%02d:%02d:%02d", hours, minutes, seconds);
 }
