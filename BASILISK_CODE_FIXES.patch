@@ -1,0 +1,43 @@
+diff --git a/aerodynamic breakup of a drop/Aerodynamic breakup of a vaporizing drop/run/bubble_growth.c b/aerodynamic breakup of a drop/Aerodynamic breakup of a vaporizing drop/run/bubble_growth.c
+index 0750677..7e26ddf 100644
+--- a/aerodynamic breakup of a drop/Aerodynamic breakup of a vaporizing drop/run/bubble_growth.c	
++++ b/aerodynamic breakup of a drop/Aerodynamic breakup of a vaporizing drop/run/bubble_growth.c	
+@@ -10,8 +10,10 @@ Section 4.3 of [Boyd et al, 2023](#boyd_consistent_2023).
+ 
+ */
+ 
+-/** 
++/**
+ ### 3D test (alternatively could be 2D axi)
++For 3D simulations: Use grid/octree.h (current configuration)
++For 2D axisymmetric: Uncomment #define AXI and use grid/multigrid.h instead
+ */
+ //#define AXI 0
+ #include "grid/octree.h"
+@@ -181,7 +183,7 @@ event progress(i++) { progress_check(i, t, T_END); }
+ */
+ #include "view.h"
+ #include "../src/post_processing/movie_maker.h"
+-event moive_output(t += DELTA_T) {
++event movie_output(t += DELTA_T) {
+   scalar temperature[];
+   foreach () {
+     temperature[] = f[] * T_L[] + (1. - f[]) * T_V[];
+diff --git a/aerodynamic breakup of a drop/Aerodynamic breakup of a vaporizing drop/src/01_vaporization/evap_include.h b/aerodynamic breakup of a drop/Aerodynamic breakup of a vaporizing drop/src/01_vaporization/evap_include.h
+index 50767fd..6be793e 100644
+--- a/aerodynamic breakup of a drop/Aerodynamic breakup of a vaporizing drop/src/01_vaporization/evap_include.h	
++++ b/aerodynamic breakup of a drop/Aerodynamic breakup of a vaporizing drop/src/01_vaporization/evap_include.h	
+@@ -77,6 +77,13 @@ int MAX_LEVEL = 6;
+ #include "utils.h"
+ 
+ #include "tag.h"
++
++// IMPORTANT: Include order matters for axisymmetric simulations with conserving method
++// The standard Basilisk pattern is:
++// 1. axi.h (if AXI is defined)
++// 2. centered solver (centered_evap.h - custom for phase change)
++// 3. two-phase (two-phase-evap.h - custom for phase change)
++// 4. conserving.h (for momentum conservation)
+ #if AXI
+ #include "axi.h"
+ #endif // AXI
