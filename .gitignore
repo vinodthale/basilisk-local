@@ -48,3 +48,36 @@ cases/**/*.log
 # Temporary files
 *.tmp
 *.temp
+tmp_*
+
+# Binary executables and build artifacts
+*.out
+*.exe
+perfs
+circle-droplet
+a.out
+
+# Analysis and exploration files (auto-generated)
+EXPLORATION_SUMMARY.md
+INDEX.md
+REORGANIZATION_ROADMAP.md
+REPOSITORY_STRUCTURE_ANALYSIS.txt
+*_AUDIT_REPORT.md
+*_COMPATIBILITY_REPORT.md
+FIXES_SUMMARY.md
+*.patch
+
+# Output and result files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+out-*
+results/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.so
+.Python
