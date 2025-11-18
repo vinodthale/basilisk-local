@@ -63,6 +63,8 @@ tmp_*
 perfs
 circle-droplet
 a.out
+first-simulation
+aerodynamic-breakup-without-vaporization/Bdropimpact
 
 # Analysis and exploration files (auto-generated)
 EXPLORATION_SUMMARY.md
