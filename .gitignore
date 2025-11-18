@@ -1,0 +1,50 @@
+# Basilisk build artifacts
+src/*.o
+src/**/*.o
+src/*.a
+src/**/*.a
+src/qcc
+src/config
+src/Makefile.deps
+src/Makefile.tests
+
+# Specific build directories and files
+src/ast/grammar
+src/ast/grammar.h
+src/ast/libast.a
+src/ast/interpreter/interpreter.o
+src/ast/*.o
+
+src/gl/libfb_tiny.a
+src/gl/libglutils.a
+src/gl/**/*.o
+src/gl/tinyrenderer/*.o
+
+src/kdt/libkdt.a
+src/kdt/kdtquery
+src/kdt/xyz2kdt
+src/kdt/*.o
+
+src/wsServer/libws.a
+src/wsServer/**/*.o
+
+src/darcsit/codeblock
+src/darcsit/literate-c
+src/darcsit/pagemagic
+src/darcsit/sanitize
+src/darcsit/urldecode
+
+# Case build directories
+cases/**/build/
+cases/**/results/
+cases/**/*.log
+
+# Editor and OS files
+*.swp
+*~
+.DS_Store
+*.bak
+
+# Temporary files
+*.tmp
+*.temp
