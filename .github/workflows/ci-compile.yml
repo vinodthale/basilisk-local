@@ -5,11 +5,13 @@ on:
     branches: [ main, fix/vof-method-compile, 'claude/**' ]
     paths:
       - 'vof-method/**'
+      - 'src/**'
       - '.github/workflows/ci-compile.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'vof-method/**'
+      - 'src/**'
       - '.github/workflows/ci-compile.yml'
 
 jobs:
@@ -46,32 +48,54 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/basilisk
-        key: ${{ runner.os }}-basilisk-${{ hashFiles('vof-method/BASILISK_INSTALL.md') }}
+        key: ${{ runner.os }}-basilisk-local-${{ hashFiles('src/**/*.c', 'src/**/*.h', 'src/**/Makefile*') }}
         restore-keys: |
-          ${{ runner.os }}-basilisk-
+          ${{ runner.os }}-basilisk-local-
 
-    ############################################################
-    # ✔ FIXED BASILISK INSTALLATION (GitHub mirror, no auth)
-    ############################################################
-    - name: Install Basilisk C
+    - name: Build Basilisk C from local source
       if: steps.cache-basilisk.outputs.cache-hit != 'true'
       env:
         GIT_TERMINAL_PROMPT: 0
       run: |
-        echo "Installing Basilisk C from GitHub mirror..."
-        cd ~
-        git clone --depth 1 https://github.com/basilisk-fr/basilisk.git
+        echo "Building Basilisk C from repository source..."
+        mkdir -p ~/basilisk
+        cp -r src ~/basilisk/
+
         cd ~/basilisk/src
-        ln -s config.gcc config
-        make -j$(nproc)
-        echo "Basilisk installation complete"
+        # Configure for GCC
+        ln -sf config.gcc config
+
+        # Build Basilisk using sequential build to avoid race conditions
+        # Note: Must use 'make' (default 'all' target) not 'make qcc' because
+        # the qcc target doesn't have subdirs as a prerequisite
+        echo "Building Basilisk (qcc compiler and libraries)..."
+        make -j1 2>&1 | tail -80
+
+        # Verify qcc was built
+        if [ ! -f qcc ]; then
+          echo "ERROR: qcc compiler was not built"
+          ls -la qcc* 2>&1 || true
+          exit 1
+        fi
+
+        # Verify GL libraries were built
+        if [ ! -f gl/libglutils.a ] || [ ! -f gl/libfb_tiny.a ]; then
+          echo "ERROR: GL libraries were not built"
+          ls -la gl/*.a 2>&1 || true
+          exit 1
+        fi
+
+        echo "Basilisk build complete"
+        ls -lh qcc gl/*.a
 
     - name: Verify Basilisk installation
       run: |
-        export BASILISK=$HOME/basilisk
+        export BASILISK=$HOME/basilisk/src
         export PATH=$PATH:$BASILISK
         which qcc
         qcc --version || echo "qcc is available"
+        # Verify GL libraries were built
+        ls -la $HOME/basilisk/src/gl/*.a || echo "Warning: GL libraries not found"
 
     - name: List VOF method files
       run: |
@@ -97,14 +121,14 @@ jobs:
 
     - name: Run quick test compilation (circle-droplet)
       run: |
-        export BASILISK=$HOME/basilisk
+        export BASILISK=$HOME/basilisk/src
         export PATH=$PATH:$BASILISK
         cd vof-method
         ./ci_run.sh test
 
     - name: Compile all VOF method simulations
       run: |
-        export BASILISK=$HOME/basilisk
+        export BASILISK=$HOME/basilisk/src
         export PATH=$PATH:$BASILISK
         cd vof-method
         ./ci_run.sh
@@ -142,7 +166,7 @@ jobs:
 
     - name: Run basic validation (circle-droplet)
       run: |
-        export BASILISK=$HOME/basilisk
+        export BASILISK=$HOME/basilisk/src
         export PATH=$PATH:$BASILISK
         cd vof-method
         timeout 10s ./circle-droplet --help || true
