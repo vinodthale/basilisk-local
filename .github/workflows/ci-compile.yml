@@ -51,9 +51,9 @@ jobs:
     - name: Install Basilisk C
       if: steps.cache-basilisk.outputs.cache-hit != 'true'
       run: |
-        echo "Installing Basilisk C from Git mirror..."
-        # Use Git mirror instead of darcs (more reliable for CI)
-        git clone --depth 1 https://gitlab.com/basilisk-fr/basilisk.git $HOME/basilisk
+        echo "Installing Basilisk C from GitHub mirror..."
+        # Use GitHub mirror (public, no authentication required)
+        git clone --depth 1 https://github.com/basilisk-fr/basilisk.git $HOME/basilisk
         cd $HOME/basilisk/src
         # Configure for GCC
         ln -s config.gcc config
