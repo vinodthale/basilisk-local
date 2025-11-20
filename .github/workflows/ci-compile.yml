@@ -59,8 +59,10 @@ jobs:
         cd ~/basilisk/src
         # Configure for GCC
         ln -s config.gcc config
-        # Build Basilisk
+        # Build Basilisk qcc compiler
         make -j$(nproc)
+        # Build GL libraries needed for VOF compilation
+        make -C gl
         echo "Basilisk installation complete"
 
     - name: Verify Basilisk installation
@@ -69,6 +71,8 @@ jobs:
         export PATH=$PATH:$BASILISK
         which qcc
         qcc --version || echo "qcc is available"
+        # Verify GL libraries were built
+        ls -la $BASILISK/src/gl/*.a || echo "Warning: GL libraries not found"
 
     - name: List VOF method files
       run: |
