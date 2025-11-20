@@ -4,6 +4,7 @@ attribute {
 }
 
 #include "tmp_fraction_field.h"
+#include "TPR2D.h"
 
 extern scalar * interfaces;
 extern scalar * tmp_interfaces;

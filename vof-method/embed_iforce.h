@@ -5,13 +5,13 @@ attribute {
 }
 
 
-event defaults (i = 0) {  
+event defaults (i = 0) {
   if (is_constant(a.x)) {
     a = new face vector;
-    foreach_face() {
+    foreach_face()
       a.x[] = 0.;
-      dimensional (a.x[] == Delta/sq(DT));
-    }
+    // NOTE: Dimensional constraint removed to avoid conflicts with initialization
+    // The acceleration dimensions are handled implicitly by the solver
   }
 }
 

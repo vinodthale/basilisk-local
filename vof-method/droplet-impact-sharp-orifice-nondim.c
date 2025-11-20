@@ -49,8 +49,7 @@
 #include "embed_vof.h"
 #include "embed_tension.h"
 #include "embed_contact.h"
-// FIXED: Use standard Basilisk adapt_wavelet (adapt_wavelet_limited.h doesn't exist)
-#include "adapt_wavelet.h"
+// FIXED: adapt_wavelet function is available from axi.h/grid headers, no explicit include needed
 
 /**
 ## Non-dimensional parameters
@@ -98,8 +97,6 @@ Adjust these for your specific case:
 #define T_END          (1.2 * T_GRAVITY_ND)  // Simulate up to t* = 1.2 T_g*
 
 // VOF tracer
-scalar f[];
-scalar * interfaces = {f};
 
 // Face vector fields
 face vector muv[];
@@ -133,7 +130,7 @@ int main() {
   muv = mu;
 
   // Contact angle
-  f.contact_angle = contact_angle;
+  // NOTE: contact_angle is managed by embed_contact.h, no attribute assignment needed
 
   run();
 }
@@ -210,12 +207,12 @@ event init (t = 0) {
   foreach() {
     if (edge_marker[] > 0.5) {
       // At sharp edge - use pinning angle
-      contact_angle.x[] = THETA_PINNING;
-      contact_angle.y[] = THETA_PINNING;
+      contact_angle[] = THETA_PINNING;
+      contact_angle[] = THETA_PINNING;
     } else {
       // Away from edge - use advancing angle initially
-      contact_angle.x[] = THETA_ADVANCING;
-      contact_angle.y[] = THETA_ADVANCING;
+      contact_angle[] = THETA_ADVANCING;
+      contact_angle[] = THETA_ADVANCING;
     }
   }
   boundary({contact_angle, edge_marker});
@@ -229,19 +226,19 @@ event contact_angle_update (i++) {
     if (cs[] > 0 && cs[] < 1) {  // At solid boundary
       if (edge_marker[] > 0.5) {
         // At sharp edge - enforce pinning angle
-        contact_angle.x[] = THETA_PINNING;
-        contact_angle.y[] = THETA_PINNING;
+        contact_angle[] = THETA_PINNING;
+        contact_angle[] = THETA_PINNING;
       } else {
         // Away from edge - apply hysteresis
-        double current_angle = contact_angle.x[];
+        double current_angle = contact_angle[];
 
         // Keep angle within hysteresis window
         if (current_angle < THETA_RECEDING) {
-          contact_angle.x[] = THETA_RECEDING;
-          contact_angle.y[] = THETA_RECEDING;
+          contact_angle[] = THETA_RECEDING;
+          contact_angle[] = THETA_RECEDING;
         } else if (current_angle > THETA_ADVANCING) {
-          contact_angle.x[] = THETA_ADVANCING;
-          contact_angle.y[] = THETA_ADVANCING;
+          contact_angle[] = THETA_ADVANCING;
+          contact_angle[] = THETA_ADVANCING;
         }
       }
     }

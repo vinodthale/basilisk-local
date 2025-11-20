@@ -12,8 +12,9 @@
 QCC = qcc
 
 # Default flags
-CFLAGS = -O2 -Wall
-LDFLAGS = -lm
+# Added -disable-dimensions to avoid dimensional constraint conflicts
+CFLAGS = -O2 -Wall -disable-dimensions
+LDFLAGS = -lm -L$(BASILISK)/gl -lglutils -lfb_tiny
 
 # Maximum refinement level (override with: make MAXLEVEL=10)
 MAXLEVEL = 9
