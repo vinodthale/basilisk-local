@@ -25,7 +25,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          darcs \
           gcc \
           make \
           gawk \
@@ -52,11 +51,10 @@ jobs:
     - name: Install Basilisk C
       if: steps.cache-basilisk.outputs.cache-hit != 'true'
       run: |
-        echo "Installing Basilisk C from source..."
-        cd ~
-        # Clone Basilisk repository
-        darcs clone http://basilisk.fr/basilisk
-        cd ~/basilisk/src
+        echo "Installing Basilisk C from Git mirror..."
+        # Use Git mirror instead of darcs (more reliable for CI)
+        git clone --depth 1 https://gitlab.com/basilisk-fr/basilisk.git $HOME/basilisk
+        cd $HOME/basilisk/src
         # Configure for GCC
         ln -s config.gcc config
         # Build Basilisk qcc compiler
