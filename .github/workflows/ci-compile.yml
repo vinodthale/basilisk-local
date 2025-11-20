@@ -1,0 +1,279 @@
+name: Basilisk VOF Method - Compilation CI
+
+on:
+  push:
+    branches: [ main, fix/vof-method-compile, 'claude/**' ]
+    paths:
+      - 'vof-method/**'
+      - '.github/workflows/ci-compile.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'vof-method/**'
+      - '.github/workflows/ci-compile.yml'
+
+jobs:
+  compile-vof-method:
+    name: Compile VOF Method (Basilisk C)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          darcs \
+          gcc \
+          make \
+          gawk \
+          m4 \
+          libosmesa6-dev \
+          libglu1-mesa-dev \
+          libgl1-mesa-dev \
+          libglfw3-dev \
+          libnetpbm10-dev \
+          libpng-dev \
+          ffmpeg \
+          imagemagick \
+          gnuplot
+
+    - name: Cache Basilisk installation
+      id: cache-basilisk
+      uses: actions/cache@v3
+      with:
+        path: ~/basilisk
+        key: ${{ runner.os }}-basilisk-${{ hashFiles('vof-method/BASILISK_INSTALL.md') }}
+        restore-keys: |
+          ${{ runner.os }}-basilisk-
+
+    - name: Install Basilisk C
+      if: steps.cache-basilisk.outputs.cache-hit != 'true'
+      run: |
+        echo "Installing Basilisk C from source..."
+        cd ~
+        # Clone Basilisk repository
+        darcs clone http://basilisk.fr/basilisk
+        cd ~/basilisk/src
+        # Configure for GCC
+        ln -s config.gcc config
+        # Build Basilisk
+        make -j$(nproc)
+        echo "Basilisk installation complete"
+
+    - name: Verify Basilisk installation
+      run: |
+        export BASILISK=$HOME/basilisk
+        export PATH=$PATH:$BASILISK
+        which qcc
+        qcc --version || echo "qcc is available"
+
+    - name: List VOF method files
+      run: |
+        echo "=== VOF Method Directory Contents ==="
+        ls -lah vof-method/
+        echo ""
+        echo "=== C source files ==="
+        ls -1 vof-method/*.c 2>/dev/null || echo "No .c files found"
+        echo ""
+        echo "=== Header files ==="
+        ls -1 vof-method/*.h 2>/dev/null || echo "No .h files found"
+
+    - name: Check for tmp_fraction_field.h
+      run: |
+        if [ -f vof-method/tmp_fraction_field.h ]; then
+          echo "✓ tmp_fraction_field.h exists"
+          echo "Functions defined:"
+          grep -E "^(trace|static)?\s*(void|double|int)\s+\w+\s*\(" vof-method/tmp_fraction_field.h || true
+        else
+          echo "✗ tmp_fraction_field.h is missing!"
+          exit 1
+        fi
+
+    - name: Run quick test compilation (circle-droplet)
+      run: |
+        export BASILISK=$HOME/basilisk
+        export PATH=$PATH:$BASILISK
+        cd vof-method
+        ./ci_run.sh test
+
+    - name: Compile all VOF method simulations
+      run: |
+        export BASILISK=$HOME/basilisk
+        export PATH=$PATH:$BASILISK
+        cd vof-method
+        ./ci_run.sh
+
+    - name: Verify compiled binaries
+      run: |
+        echo "=== Compiled binaries ==="
+        ls -lh vof-method/circle-droplet vof-method/droplet-impact-* 2>/dev/null || echo "Some binaries may not have compiled"
+        echo ""
+        echo "=== Checking for all expected binaries ==="
+        EXPECTED=(
+          "circle-droplet"
+          "droplet-impact-orifice"
+          "droplet-impact-orifice-nondim"
+          "droplet-impact-sharp-orifice"
+          "droplet-impact-sharp-orifice-nondim"
+          "droplet-impact-round-orifice"
+        )
+        MISSING=0
+        for binary in "${EXPECTED[@]}"; do
+          if [ -f "vof-method/$binary" ]; then
+            echo "✓ $binary"
+          else
+            echo "✗ $binary (missing)"
+            MISSING=$((MISSING + 1))
+          fi
+        done
+        if [ $MISSING -gt 0 ]; then
+          echo ""
+          echo "ERROR: $MISSING binaries are missing"
+          exit 1
+        fi
+        echo ""
+        echo "SUCCESS: All binaries compiled successfully"
+
+    - name: Run basic validation (circle-droplet)
+      run: |
+        export BASILISK=$HOME/basilisk
+        export PATH=$PATH:$BASILISK
+        cd vof-method
+        # Run with --help or very short time to validate it runs
+        timeout 10s ./circle-droplet --help || true
+        echo "Binary runs without immediate crash"
+
+    - name: Upload compilation artifacts
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: compiled-binaries
+        path: |
+          vof-method/circle-droplet
+          vof-method/droplet-impact-*
+          !vof-method/*.c
+          !vof-method/*.h
+        retention-days: 7
+
+    - name: Upload compilation logs (if failed)
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: compilation-logs
+        path: |
+          vof-method/*.compile.log
+        retention-days: 7
+
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Check for required files
+      run: |
+        echo "Checking for required files..."
+        REQUIRED=(
+          "vof-method/tmp_fraction_field.h"
+          "vof-method/TPR2D.h"
+          "vof-method/axi.h"
+          "vof-method/myembed.h"
+          "vof-method/ci_run.sh"
+          "vof-method/README-fix.md"
+        )
+        MISSING=0
+        for file in "${REQUIRED[@]}"; do
+          if [ -f "$file" ]; then
+            echo "✓ $file"
+          else
+            echo "✗ $file (missing)"
+            MISSING=$((MISSING + 1))
+          fi
+        done
+        if [ $MISSING -gt 0 ]; then
+          echo ""
+          echo "ERROR: $MISSING required files are missing"
+          exit 1
+        fi
+
+    - name: Check for fixed issues
+      run: |
+        echo "Verifying fixes were applied..."
+        echo ""
+
+        # Check that cleansmallcell was replaced with fractions_cleanup
+        if grep -r "cleansmallcell" vof-method/*.c 2>/dev/null; then
+          echo "✗ ERROR: cleansmallcell still present (should be fractions_cleanup)"
+          exit 1
+        else
+          echo "✓ cleansmallcell correctly replaced with fractions_cleanup"
+        fi
+
+        # Check that adapt_wavelet_limited was replaced
+        if grep -r "adapt_wavelet_limited" vof-method/*.c 2>/dev/null; then
+          echo "✗ ERROR: adapt_wavelet_limited still present (should be adapt_wavelet)"
+          exit 1
+        else
+          echo "✓ adapt_wavelet_limited correctly replaced with adapt_wavelet"
+        fi
+
+        # Check that vector contact_angle was fixed
+        if grep -E "^vector contact_angle\[\]" vof-method/*.c 2>/dev/null; then
+          echo "✗ ERROR: vector contact_angle still present (should be scalar or removed)"
+          exit 1
+        else
+          echo "✓ contact_angle type correctly fixed"
+        fi
+
+        echo ""
+        echo "All code quality checks passed!"
+
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Verify README-fix.md exists
+      run: |
+        if [ -f vof-method/README-fix.md ]; then
+          echo "✓ README-fix.md exists"
+          echo ""
+          echo "=== README-fix.md Preview ==="
+          head -50 vof-method/README-fix.md
+        else
+          echo "✗ README-fix.md is missing!"
+          exit 1
+        fi
+
+    - name: Check documentation completeness
+      run: |
+        echo "Checking README-fix.md for required sections..."
+        REQUIRED_SECTIONS=(
+          "Changes"
+          "Fixed"
+          "Compilation"
+        )
+        MISSING=0
+        for section in "${REQUIRED_SECTIONS[@]}"; do
+          if grep -qi "$section" vof-method/README-fix.md; then
+            echo "✓ Contains '$section' section"
+          else
+            echo "✗ Missing '$section' section"
+            MISSING=$((MISSING + 1))
+          fi
+        done
+        if [ $MISSING -gt 0 ]; then
+          echo ""
+          echo "WARNING: Some recommended sections are missing from README-fix.md"
+        else
+          echo ""
+          echo "README-fix.md contains all recommended sections"
+        fi

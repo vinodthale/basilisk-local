@@ -86,7 +86,7 @@ int main()
 event init (t = 0)
 {
   solid(cs,fs, (sq(y - hsolid) + sq(x) - sq(r0)));
-  cleansmallcell (cs, fs, csTL);
+  fractions_cleanup (cs, fs, csTL);
 
   // FIXED: Correct VOF fraction formula (positive inside sphere, negative outside)
   fraction(f, sq(rr0) - sq(x) - sq(y - hcircle));

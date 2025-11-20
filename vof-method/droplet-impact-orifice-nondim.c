@@ -207,7 +207,7 @@ event init (t = 0)
   fractions(phi, cs, fs);
 
   // Clean up small cut cells
-  cleansmallcell(cs, fs, csTL);
+  fractions_cleanup(cs, fs, csTL);
 
   /**
   ## Droplet initialization
