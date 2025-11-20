@@ -1,4 +1,5 @@
 #include "tmp_fraction_field.h"
+#include "TPR2D.h"
 
 /**
 Calculate the height function using parabolic fitting, please refer to the article ~ for algorithm details.*/
@@ -376,7 +377,7 @@ void recompute_h (scalar f, scalar tmp_c, scalar cs, scalar mark, scalar contact
   vector ms[];
   scalar alphacs[];
   reconstruction_cs(cs, fs, ms, alphacs);
-  reconstruction_mc_myc(tmp_c, mc);
+  reconstruction_mc(tmp_c, mc);
 
     foreach(){
 
@@ -394,7 +395,7 @@ void recompute_h (scalar f, scalar tmp_c, scalar cs, scalar mark, scalar contact
       }
       else if (mark[]==2 || mark[]==3){
         double me = 0;
-        coord nnc;
+        coord nnc = {0, 0};
         coord mms;
         mms.x = ms.x[];
         mms.y = ms.y[];
@@ -415,7 +416,7 @@ void recompute_h (scalar f, scalar tmp_c, scalar cs, scalar mark, scalar contact
       }
       else{
         double me = 0;
-        coord nnc;
+        coord nnc = {0, 0};
         double anglemy = contact_angle[];
         foreach_neighbor(1){
           if (mark[]==4||mark[]==5){

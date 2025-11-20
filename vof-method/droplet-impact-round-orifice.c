@@ -34,8 +34,7 @@
 #include "embed_vof.h"
 #include "embed_tension.h"
 #include "embed_contact.h"
-// FIXED: Use standard Basilisk adapt_wavelet (adapt_wavelet_limited.h doesn't exist)
-#include "adapt_wavelet.h"
+// FIXED: adapt_wavelet function is available from axi.h/grid headers, no explicit include needed
 
 // Physical properties (SI units)
 #define RHO_DROPLET    1130.0      // kg/m³
@@ -73,8 +72,6 @@
 #define T_END          (3.0 * T_GRAVITY)  // Simulate up to t = 3.0 in dimensionless time
 
 // VOF tracer
-scalar f[];
-scalar * interfaces = {f};
 
 // Face vector fields
 face vector muv[];
@@ -107,7 +104,7 @@ int main() {
   muv = mu;
 
   // Contact angle
-  f.contact_angle = contact_angle;
+  // NOTE: contact_angle is managed by embed_contact.h, no attribute assignment needed
 
   run();
 }
@@ -184,8 +181,8 @@ event init (t = 0) {
 
   // Initialize contact angle (180 degrees = no wetting)
   foreach() {
-    contact_angle.x[] = THETA_CONTACT;
-    contact_angle.y[] = THETA_CONTACT;
+    contact_angle[] = THETA_CONTACT;
+    contact_angle[] = THETA_CONTACT;
   }
   boundary({contact_angle});
 }

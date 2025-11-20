@@ -37,8 +37,7 @@
 #include "embed_vof.h"
 #include "embed_tension.h"
 #include "embed_contact.h"
-// FIXED: Use standard Basilisk adapt_wavelet (adapt_wavelet_limited.h doesn't exist)
-#include "adapt_wavelet.h"
+// FIXED: adapt_wavelet function is available from axi.h/grid headers, no explicit include needed
 
 // Physical properties (SI units)
 #define RHO_DROPLET    1130.0      // kg/m³
@@ -81,17 +80,13 @@
 // Passage time scale (defined based on impact velocity)
 // Will be calculated after determining U_i (velocity 10 ms before impact)
 
-// VOF tracer
-scalar f[];
-scalar * interfaces = {f};
+// NOTE: f and interfaces are already defined in embed_two-phase.h, no need to redeclare
 
 // Face vector fields
 face vector muv[];
 face vector av[];
 
-// Contact angle (with hysteresis and pinning)
-// FIXED: contact_angle is a scalar field, not a vector (already declared in embed_contact.h)
-// vector contact_angle[];  // REMOVED: Already declared in embed_contact.h as scalar
+// NOTE: contact_angle is already declared in embed_contact.h
 scalar edge_marker[];  // Marker for sharp edge region
 
 int main() {
@@ -116,8 +111,7 @@ int main() {
   // Set viscosity
   muv = mu;
 
-  // Contact angle
-  f.contact_angle = contact_angle;
+  // NOTE: contact_angle is managed by embed_contact.h, no attribute assignment needed
 
   run();
 }
@@ -193,12 +187,12 @@ event init (t = 0) {
   foreach() {
     if (edge_marker[] > 0.5) {
       // At sharp edge - use pinning angle
-      contact_angle.x[] = THETA_PINNING;
-      contact_angle.y[] = THETA_PINNING;
+      contact_angle[] = THETA_PINNING;
+      contact_angle[] = THETA_PINNING;
     } else {
       // Away from edge - use advancing angle initially
-      contact_angle.x[] = THETA_ADVANCING;
-      contact_angle.y[] = THETA_ADVANCING;
+      contact_angle[] = THETA_ADVANCING;
+      contact_angle[] = THETA_ADVANCING;
     }
   }
   boundary({contact_angle, edge_marker});
@@ -212,8 +206,8 @@ event contact_angle_update (i++) {
     if (cs[] > 0 && cs[] < 1) {  // At solid boundary
       if (edge_marker[] > 0.5) {
         // At sharp edge - enforce pinning angle
-        contact_angle.x[] = THETA_PINNING;
-        contact_angle.y[] = THETA_PINNING;
+        contact_angle[] = THETA_PINNING;
+        contact_angle[] = THETA_PINNING;
       } else {
         // Away from edge - apply hysteresis
         // This is simplified; proper hysteresis requires tracking contact line velocity
@@ -221,15 +215,15 @@ event contact_angle_update (i++) {
 
         // Check if interface is advancing or receding
         // (This would require velocity information; simplified here)
-        double current_angle = contact_angle.x[];
+        double current_angle = contact_angle[];
 
         // Keep angle within hysteresis window
         if (current_angle < THETA_RECEDING) {
-          contact_angle.x[] = THETA_RECEDING;
-          contact_angle.y[] = THETA_RECEDING;
+          contact_angle[] = THETA_RECEDING;
+          contact_angle[] = THETA_RECEDING;
         } else if (current_angle > THETA_ADVANCING) {
-          contact_angle.x[] = THETA_ADVANCING;
-          contact_angle.y[] = THETA_ADVANCING;
+          contact_angle[] = THETA_ADVANCING;
+          contact_angle[] = THETA_ADVANCING;
         }
       }
     }
