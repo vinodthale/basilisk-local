@@ -51,13 +51,16 @@ jobs:
     - name: Install Basilisk C
       if: steps.cache-basilisk.outputs.cache-hit != 'true'
       run: |
-        echo "Downloading Basilisk C from GitHub tarball..."
-        mkdir -p $HOME/basilisk
-        # Use tarball instead of git clone (avoids all authentication/IPv6 issues)
-        curl -L https://github.com/basilisk-fr/basilisk/archive/refs/heads/master.tar.gz \
-          | tar -xz --strip-components=1 -C $HOME/basilisk
+        echo "Downloading Basilisk C from official source..."
+        cd ~
+        # Use official Basilisk tarball (always available, no auth required)
+        curl -L http://basilisk.fr/basilisk.tar.gz -o basilisk.tar.gz
 
-        cd $HOME/basilisk/src
+        echo "Extracting Basilisk..."
+        mkdir -p basilisk
+        tar -xzf basilisk.tar.gz -C basilisk --strip-components=1
+
+        cd ~/basilisk/src
         # Configure for GCC
         ln -s config.gcc config
         # Build Basilisk qcc compiler
