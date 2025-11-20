@@ -51,9 +51,12 @@ jobs:
     - name: Install Basilisk C
       if: steps.cache-basilisk.outputs.cache-hit != 'true'
       run: |
-        echo "Installing Basilisk C from GitHub mirror..."
-        # Use GitHub mirror (public, no authentication required)
-        git clone --depth 1 https://github.com/basilisk-fr/basilisk.git $HOME/basilisk
+        echo "Downloading Basilisk C from GitHub tarball..."
+        mkdir -p $HOME/basilisk
+        # Use tarball instead of git clone (avoids all authentication/IPv6 issues)
+        curl -L https://github.com/basilisk-fr/basilisk/archive/refs/heads/master.tar.gz \
+          | tar -xz --strip-components=1 -C $HOME/basilisk
+
         cd $HOME/basilisk/src
         # Configure for GCC
         ln -s config.gcc config
