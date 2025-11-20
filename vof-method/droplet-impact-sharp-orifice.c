@@ -37,8 +37,8 @@
 #include "embed_vof.h"
 #include "embed_tension.h"
 #include "embed_contact.h"
-// FIXED: If adapt_wavelet_limited.h is unavailable, use standard adapt_wavelet
-#include "adapt_wavelet_limited.h"
+// FIXED: Use standard Basilisk adapt_wavelet (adapt_wavelet_limited.h doesn't exist)
+#include "adapt_wavelet.h"
 
 // Physical properties (SI units)
 #define RHO_DROPLET    1130.0      // kg/m³
@@ -90,7 +90,8 @@ face vector muv[];
 face vector av[];
 
 // Contact angle (with hysteresis and pinning)
-vector contact_angle[];
+// FIXED: contact_angle is a scalar field, not a vector (already declared in embed_contact.h)
+// vector contact_angle[];  // REMOVED: Already declared in embed_contact.h as scalar
 scalar edge_marker[];  // Marker for sharp edge region
 
 int main() {
@@ -240,7 +241,7 @@ event contact_angle_update (i++) {
  * Adaptive mesh refinement
  */
 event adapt (i++) {
-  adapt_wavelet_limited ((scalar *){f, u.x, u.y},
+  adapt_wavelet ((scalar *){f, u.x, u.y},
                          (double[]){0.01, 0.01, 0.01},
                          MAXLEVEL, MINLEVEL);
 }
