@@ -114,8 +114,15 @@ compile_file() {
 
     print_status "Compiling $source_file..."
 
+    # Set up OpenGL library paths (if BASILISK is set)
+    GL_LIBS=""
+    if [ -n "$BASILISK" ] && [ -d "$BASILISK/gl" ]; then
+        GL_LIBS="-L$BASILISK/gl -lglutils -lfb_tiny"
+    fi
+
     # Try to compile with qcc
-    if qcc -Wall -O2 -o "$binary_name" "$source_file" -lm 2>&1 | tee "${binary_name}.compile.log"; then
+    # Note: -disable-dimensions avoids dimensional constraint conflicts in embed_iforce.h
+    if qcc -Wall -O2 -disable-dimensions -o "$binary_name" "$source_file" -lm $GL_LIBS 2>&1 | tee "${binary_name}.compile.log"; then
         if [ -f "$binary_name" ]; then
             print_status "✓ Successfully compiled $source_file"
             rm -f "${binary_name}.compile.log"
