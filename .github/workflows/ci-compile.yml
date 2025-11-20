@@ -39,44 +39,39 @@ jobs:
           imagemagick \
           gnuplot
 
-    - name: Cache Basilisk installation
+    - name: Cache Basilisk build
       id: cache-basilisk
       uses: actions/cache@v4
       with:
-        path: ~/basilisk
-        key: ${{ runner.os }}-basilisk-${{ hashFiles('vof-method/BASILISK_INSTALL.md') }}
+        path: |
+          src/qcc
+          src/gl/*.a
+          src/ast/libast.a
+        key: ${{ runner.os }}-basilisk-build-${{ hashFiles('src/Makefile', 'src/config.gcc') }}
         restore-keys: |
-          ${{ runner.os }}-basilisk-
+          ${{ runner.os }}-basilisk-build-
 
-    - name: Install Basilisk C
+    - name: Build Basilisk C (if not cached)
       if: steps.cache-basilisk.outputs.cache-hit != 'true'
       run: |
-        echo "Downloading Basilisk C from official source..."
-        cd ~
-        # Use official Basilisk tarball (always available, no auth required)
-        curl -L http://basilisk.fr/basilisk.tar.gz -o basilisk.tar.gz
-
-        echo "Extracting Basilisk..."
-        mkdir -p basilisk
-        tar -xzf basilisk.tar.gz -C basilisk --strip-components=1
-
-        cd ~/basilisk/src
+        echo "Building Basilisk from repository source..."
+        cd src
         # Configure for GCC
-        ln -s config.gcc config
+        ln -sf config.gcc config
         # Build Basilisk qcc compiler
         make -j$(nproc)
         # Build GL libraries needed for VOF compilation
         make -C gl
-        echo "Basilisk installation complete"
+        echo "Basilisk build complete"
 
     - name: Verify Basilisk installation
       run: |
-        export BASILISK=$HOME/basilisk
+        export BASILISK=${{ github.workspace }}/src
         export PATH=$PATH:$BASILISK
         which qcc
         qcc --version || echo "qcc is available"
         # Verify GL libraries were built
-        ls -la $BASILISK/src/gl/*.a || echo "Warning: GL libraries not found"
+        ls -la src/gl/*.a || echo "Warning: GL libraries not found"
 
     - name: List VOF method files
       run: |
@@ -102,14 +97,14 @@ jobs:
 
     - name: Run quick test compilation (circle-droplet)
       run: |
-        export BASILISK=$HOME/basilisk
+        export BASILISK=${{ github.workspace }}/src
         export PATH=$PATH:$BASILISK
         cd vof-method
         ./ci_run.sh test
 
     - name: Compile all VOF method simulations
       run: |
-        export BASILISK=$HOME/basilisk
+        export BASILISK=${{ github.workspace }}/src
         export PATH=$PATH:$BASILISK
         cd vof-method
         ./ci_run.sh
@@ -147,7 +142,7 @@ jobs:
 
     - name: Run basic validation (circle-droplet)
       run: |
-        export BASILISK=$HOME/basilisk
+        export BASILISK=${{ github.workspace }}/src
         export PATH=$PATH:$BASILISK
         cd vof-method
         # Run with --help or very short time to validate it runs
