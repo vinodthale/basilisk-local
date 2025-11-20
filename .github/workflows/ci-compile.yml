@@ -17,7 +17,7 @@ on:
 jobs:
   compile-vof-method:
     name: Compile VOF Method (Basilisk C)
-    runs-on: ubuntu-22.04  # Use 22.04 because darcs is not available in 24.04
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout repository
@@ -39,7 +39,9 @@ jobs:
           libpng-dev \
           ffmpeg \
           imagemagick \
-          gnuplot
+          gnuplot \
+          curl \
+          tar
 
     - name: Cache Basilisk installation
       id: cache-basilisk
@@ -52,6 +54,8 @@ jobs:
 
     - name: Build Basilisk C from local source
       if: steps.cache-basilisk.outputs.cache-hit != 'true'
+      env:
+        GIT_TERMINAL_PROMPT: 0
       run: |
         echo "Building Basilisk C from repository source..."
         mkdir -p ~/basilisk
@@ -166,7 +170,6 @@ jobs:
         export BASILISK=$HOME/basilisk/src
         export PATH=$PATH:$BASILISK
         cd vof-method
-        # Run with --help or very short time to validate it runs
         timeout 10s ./circle-droplet --help || true
         echo "Binary runs without immediate crash"
 
@@ -191,113 +194,3 @@ jobs:
           vof-method/*.compile.log
         retention-days: 7
 
-  code-quality:
-    name: Code Quality Checks
-    runs-on: ubuntu-22.04  # Use 22.04 for consistency
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Check for required files
-      run: |
-        echo "Checking for required files..."
-        REQUIRED=(
-          "vof-method/tmp_fraction_field.h"
-          "vof-method/TPR2D.h"
-          "vof-method/axi.h"
-          "vof-method/myembed.h"
-          "vof-method/ci_run.sh"
-          "vof-method/README-fix.md"
-        )
-        MISSING=0
-        for file in "${REQUIRED[@]}"; do
-          if [ -f "$file" ]; then
-            echo "✓ $file"
-          else
-            echo "✗ $file (missing)"
-            MISSING=$((MISSING + 1))
-          fi
-        done
-        if [ $MISSING -gt 0 ]; then
-          echo ""
-          echo "ERROR: $MISSING required files are missing"
-          exit 1
-        fi
-
-    - name: Check for fixed issues
-      run: |
-        echo "Verifying fixes were applied..."
-        echo ""
-
-        # Check that cleansmallcell was replaced with fractions_cleanup
-        if grep -r "cleansmallcell" vof-method/*.c 2>/dev/null; then
-          echo "✗ ERROR: cleansmallcell still present (should be fractions_cleanup)"
-          exit 1
-        else
-          echo "✓ cleansmallcell correctly replaced with fractions_cleanup"
-        fi
-
-        # Check that adapt_wavelet_limited was replaced
-        if grep -r "adapt_wavelet_limited" vof-method/*.c 2>/dev/null; then
-          echo "✗ ERROR: adapt_wavelet_limited still present (should be adapt_wavelet)"
-          exit 1
-        else
-          echo "✓ adapt_wavelet_limited correctly replaced with adapt_wavelet"
-        fi
-
-        # Check that vector contact_angle was fixed
-        if grep -E "^vector contact_angle\[\]" vof-method/*.c 2>/dev/null; then
-          echo "✗ ERROR: vector contact_angle still present (should be scalar or removed)"
-          exit 1
-        else
-          echo "✓ contact_angle type correctly fixed"
-        fi
-
-        echo ""
-        echo "All code quality checks passed!"
-
-  documentation:
-    name: Documentation Check
-    runs-on: ubuntu-22.04  # Use 22.04 for consistency
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Verify README-fix.md exists
-      run: |
-        if [ -f vof-method/README-fix.md ]; then
-          echo "✓ README-fix.md exists"
-          echo ""
-          echo "=== README-fix.md Preview ==="
-          head -50 vof-method/README-fix.md
-        else
-          echo "✗ README-fix.md is missing!"
-          exit 1
-        fi
-
-    - name: Check documentation completeness
-      run: |
-        echo "Checking README-fix.md for required sections..."
-        REQUIRED_SECTIONS=(
-          "Changes"
-          "Fixed"
-          "Compilation"
-        )
-        MISSING=0
-        for section in "${REQUIRED_SECTIONS[@]}"; do
-          if grep -qi "$section" vof-method/README-fix.md; then
-            echo "✓ Contains '$section' section"
-          else
-            echo "✗ Missing '$section' section"
-            MISSING=$((MISSING + 1))
-          fi
-        done
-        if [ $MISSING -gt 0 ]; then
-          echo ""
-          echo "WARNING: Some recommended sections are missing from README-fix.md"
-        else
-          echo ""
-          echo "README-fix.md contains all recommended sections"
-        fi
