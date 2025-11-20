@@ -65,24 +65,23 @@ jobs:
         # Configure for GCC
         ln -sf config.gcc config
 
-        # Build Basilisk qcc compiler using sequential build to avoid race conditions
-        # Note: Parallel builds (-j) can cause "No rule to make target 'ast/libast.a'" errors
-        echo "Building qcc compiler and libraries..."
-        make -j1 qcc 2>&1 | tail -50
+        # Build Basilisk using sequential build to avoid race conditions
+        # Note: Must use 'make' (default 'all' target) not 'make qcc' because
+        # the qcc target doesn't have subdirs as a prerequisite
+        echo "Building Basilisk (qcc compiler and libraries)..."
+        make -j1 2>&1 | tail -80
 
         # Verify qcc was built
         if [ ! -f qcc ]; then
           echo "ERROR: qcc compiler was not built"
+          ls -la qcc* 2>&1 || true
           exit 1
         fi
-
-        # Build GL libraries needed for VOF visualization
-        echo "Building GL libraries..."
-        make -C gl 2>&1 | tail -20
 
         # Verify GL libraries were built
         if [ ! -f gl/libglutils.a ] || [ ! -f gl/libfb_tiny.a ]; then
           echo "ERROR: GL libraries were not built"
+          ls -la gl/*.a 2>&1 || true
           exit 1
         fi
 
