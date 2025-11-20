@@ -42,7 +42,7 @@ jobs:
 
     - name: Cache Basilisk installation
       id: cache-basilisk
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/basilisk
         key: ${{ runner.os }}-basilisk-${{ hashFiles('vof-method/BASILISK_INSTALL.md') }}
@@ -148,7 +148,7 @@ jobs:
 
     - name: Upload compilation artifacts
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: compiled-binaries
         path: |
@@ -160,7 +160,7 @@ jobs:
 
     - name: Upload compilation logs (if failed)
       if: failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: compilation-logs
         path: |
