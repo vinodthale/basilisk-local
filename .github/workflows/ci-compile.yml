@@ -15,7 +15,7 @@ on:
 jobs:
   compile-vof-method:
     name: Compile VOF Method (Basilisk C)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # Use 22.04 because darcs is not available in 24.04
 
     steps:
     - name: Checkout repository
@@ -169,7 +169,7 @@ jobs:
 
   code-quality:
     name: Code Quality Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # Use 22.04 for consistency
 
     steps:
     - name: Checkout repository
@@ -235,7 +235,7 @@ jobs:
 
   documentation:
     name: Documentation Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # Use 22.04 for consistency
 
     steps:
     - name: Checkout repository
