@@ -64,7 +64,8 @@ jobs:
         cd "$BASILISK_SRC"
         ln -sf config.gcc config
 
-        echo "Building qcc (ONLY)..."
+        echo "Building qcc and dependencies..."
+        cd ast && make && cd ..
         make -j1 qcc
 
         if [ ! -x qcc ]; then
