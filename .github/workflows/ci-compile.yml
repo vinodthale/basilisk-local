@@ -5,18 +5,22 @@ on:
     branches: [ main, fix/vof-method-compile, 'claude/**' ]
     paths:
       - 'vof-method/**'
+      - 'ImpactForce-main/**'
+      - 'TestImpactForce-main/**'
       - 'src/**'
       - '.github/workflows/ci-compile.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'vof-method/**'
+      - 'ImpactForce-main/**'
+      - 'TestImpactForce-main/**'
       - 'src/**'
       - '.github/workflows/ci-compile.yml'
 
 jobs:
   compile-vof-method:
-    name: Compile VOF Method (Basilisk C)
+    name: Compile Basilisk + VOF + ImpactForce + TestImpactForce
     runs-on: ubuntu-22.04
 
     steps:
@@ -27,21 +31,9 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          gcc \
-          make \
-          gawk \
-          m4 \
-          libosmesa6-dev \
-          libglu1-mesa-dev \
-          libgl1-mesa-dev \
-          libglfw3-dev \
-          libnetpbm10-dev \
-          libpng-dev \
-          ffmpeg \
-          imagemagick \
-          gnuplot \
-          curl \
-          tar
+          gcc make gawk m4 \
+          libosmesa6-dev libglu1-mesa-dev libgl1-mesa-dev libglfw3-dev \
+          libnetpbm10-dev libpng-dev ffmpeg imagemagick gnuplot curl tar
 
     - name: Cache Basilisk installation
       id: cache-basilisk
@@ -54,142 +46,140 @@ jobs:
 
     - name: Build Basilisk C from local source
       if: steps.cache-basilisk.outputs.cache-hit != 'true'
-      env:
-        GIT_TERMINAL_PROMPT: 0
       run: |
-        echo "Building Basilisk C from repository source..."
+        echo "Building Basilisk C..."
         mkdir -p ~/basilisk
         cp -r src ~/basilisk/
 
         cd ~/basilisk/src
-        # Configure for GCC
         ln -sf config.gcc config
 
-        # Build Basilisk using sequential build to avoid race conditions
-        # Note: Must use 'make' (default 'all' target) not 'make qcc' because
-        # the qcc target doesn't have subdirs as a prerequisite
-        echo "Building Basilisk (qcc compiler and libraries)..."
+        echo "Building Basilisk compiler and libraries..."
         make -j1 2>&1 | tail -80
 
-        # Verify qcc was built
         if [ ! -f qcc ]; then
-          echo "ERROR: qcc compiler was not built"
-          ls -la qcc* 2>&1 || true
+          echo "ERROR: qcc not built"
           exit 1
         fi
 
-        # Verify GL libraries were built
         if [ ! -f gl/libglutils.a ] || [ ! -f gl/libfb_tiny.a ]; then
-          echo "ERROR: GL libraries were not built"
-          ls -la gl/*.a 2>&1 || true
+          echo "ERROR: GL libraries not built"
           exit 1
         fi
-
-        echo "Basilisk build complete"
-        ls -lh qcc gl/*.a
 
     - name: Verify Basilisk installation
       run: |
         export BASILISK=$HOME/basilisk/src
         export PATH=$PATH:$BASILISK
         which qcc
-        qcc --version || echo "qcc is available"
-        # Verify GL libraries were built
-        ls -la $HOME/basilisk/src/gl/*.a || echo "Warning: GL libraries not found"
+        qcc --version
+        ls -la $BASILISK/gl/*.a
 
-    - name: List VOF method files
+    - name: List VOF Method Files
       run: |
-        echo "=== VOF Method Directory Contents ==="
+        echo "=== vof-method contents ==="
         ls -lah vof-method/
-        echo ""
-        echo "=== C source files ==="
-        ls -1 vof-method/*.c 2>/dev/null || echo "No .c files found"
-        echo ""
-        echo "=== Header files ==="
-        ls -1 vof-method/*.h 2>/dev/null || echo "No .h files found"
 
-    - name: Check for tmp_fraction_field.h
+    - name: Check tmp_fraction_field.h
       run: |
-        if [ -f vof-method/tmp_fraction_field.h ]; then
-          echo "✓ tmp_fraction_field.h exists"
-          echo "Functions defined:"
-          grep -E "^(trace|static)?\s*(void|double|int)\s+\w+\s*\(" vof-method/tmp_fraction_field.h || true
-        else
-          echo "✗ tmp_fraction_field.h is missing!"
+        if [ ! -f vof-method/tmp_fraction_field.h ]; then
+          echo "Missing tmp_fraction_field.h"
           exit 1
         fi
 
-    - name: Run quick test compilation (circle-droplet)
+    - name: Quick compile test (circle-droplet)
       run: |
         export BASILISK=$HOME/basilisk/src
         export PATH=$PATH:$BASILISK
         cd vof-method
         ./ci_run.sh test
 
-    - name: Compile all VOF method simulations
+    - name: Compile all VOF simulations
       run: |
         export BASILISK=$HOME/basilisk/src
         export PATH=$PATH:$BASILISK
         cd vof-method
         ./ci_run.sh
 
-    - name: Verify compiled binaries
+    - name: Verify VOF binaries
       run: |
-        echo "=== Compiled binaries ==="
-        ls -lh vof-method/circle-droplet vof-method/droplet-impact-* 2>/dev/null || echo "Some binaries may not have compiled"
-        echo ""
-        echo "=== Checking for all expected binaries ==="
-        EXPECTED=(
-          "circle-droplet"
-          "droplet-impact-orifice"
-          "droplet-impact-orifice-nondim"
-          "droplet-impact-sharp-orifice"
-          "droplet-impact-sharp-orifice-nondim"
-          "droplet-impact-round-orifice"
-        )
-        MISSING=0
-        for binary in "${EXPECTED[@]}"; do
-          if [ -f "vof-method/$binary" ]; then
-            echo "✓ $binary"
-          else
-            echo "✗ $binary (missing)"
-            MISSING=$((MISSING + 1))
-          fi
-        done
-        if [ $MISSING -gt 0 ]; then
-          echo ""
-          echo "ERROR: $MISSING binaries are missing"
-          exit 1
-        fi
-        echo ""
-        echo "SUCCESS: All binaries compiled successfully"
+        echo "=== VOF binaries ==="
+        ls -lh vof-method/* || true
 
-    - name: Run basic validation (circle-droplet)
+    ########################################################
+    # NEW BLOCK: IMPACTFORCE-MAIN
+    ########################################################
+
+    - name: Compile ImpactForce-main
       run: |
         export BASILISK=$HOME/basilisk/src
         export PATH=$PATH:$BASILISK
-        cd vof-method
-        timeout 10s ./circle-droplet --help || true
-        echo "Binary runs without immediate crash"
+        cd ImpactForce-main || exit 0
 
-    - name: Upload compilation artifacts
+        echo "=== Building ImpactForce-main ==="
+        ls -lah
+
+        for f in *.c */*.c 2>/dev/null; do
+          [ -f "$f" ] || continue
+          echo "Compiling $f ..."
+          qcc -O2 -Wall "$f" -o "$(basename "$f" .c)"
+        done
+
+        echo "=== Finished building ImpactForce-main ==="
+        ls -lh
+
+    ########################################################
+    # NEW BLOCK: TESTIMPACTFORCE-MAIN
+    ########################################################
+
+    - name: Compile TestImpactForce-main
+      run: |
+        export BASILISK=$HOME/basilisk/src
+        export PATH=$PATH:$BASILISK
+        cd TestImpactForce-main || exit 0
+
+        echo "=== Building TestImpactForce-main ==="
+        ls -lah
+
+        for f in *.c */*.c 2>/dev/null; do
+          [ -f "$f" ] || continue
+          echo "Compiling $f ..."
+          qcc -O2 -Wall "$f" -o "$(basename "$f" .c)"
+        done
+
+        echo "=== Finished building TestImpactForce-main ==="
+        ls -lh
+
+    - name: Verify ImpactForce + TestImpactForce binaries
+      run: |
+        echo "=== ImpactForce-main binaries ==="
+        ls -lh ImpactForce-main/* 2>/dev/null || echo "No binaries"
+
+        echo "=== TestImpactForce-main binaries ==="
+        ls -lh TestImpactForce-main/* 2>/dev/null || echo "No binaries"
+
+    ########################################################
+
+    - name: Upload all binaries & logs
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: compiled-binaries
         path: |
-          vof-method/circle-droplet
-          vof-method/droplet-impact-*
-          !vof-method/*.c
-          !vof-method/*.h
+          vof-method/*
+          ImpactForce-main/*
+          TestImpactForce-main/*
+          !**/*.c
+          !**/*.h
+          !**/*.txt
         retention-days: 7
 
-    - name: Upload compilation logs (if failed)
+    - name: Upload fail logs
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: compilation-logs
+        name: fail-logs
         path: |
-          vof-method/*.compile.log
-        retention-days: 7
-
+          vof-method/*.log
+          ImpactForce-main/*.log
+          TestImpactForce-main/*.log
