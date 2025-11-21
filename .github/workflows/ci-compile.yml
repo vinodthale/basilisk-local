@@ -174,4 +174,3 @@ EOF
         name: compiled-binaries
         path: /tmp/ci-artifacts
         retention-days: 7
-
