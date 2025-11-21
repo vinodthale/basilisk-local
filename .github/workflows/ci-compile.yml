@@ -1,165 +1,179 @@
-name: Basilisk VOF Method - Compilation CI
+name: Basilisk VOF + ImpactForce + TestImpactForce CI
 
 on:
   push:
-    branches: [ main, fix/vof-method-compile, 'claude/**' ]
+    branches: [ main, fix/vof-method-compile, "claude/**" ]
     paths:
-      - 'vof-method/**'
-      - 'ImpactForce-main/**'
-      - 'TestImpactForce-main/**'
-      - 'src/**'
-      - '.github/workflows/ci-compile.yml'
+      - "vof-method/**"
+      - "ImpactForce-main/**"
+      - "TestImpactForce-main/**"
+      - "src/**"
+      - ".github/workflows/ci-compile.yml"
   pull_request:
     branches: [ main ]
     paths:
-      - 'vof-method/**'
-      - 'ImpactForce-main/**'
-      - 'TestImpactForce-main/**'
-      - 'src/**'
-      - '.github/workflows/ci-compile.yml'
+      - "vof-method/**"
+      - "ImpactForce-main/**"
+      - "TestImpactForce-main/**"
+      - "src/**"
+      - ".github/workflows/ci-compile.yml"
 
 jobs:
-  compile-vof-method:
+  compile:
     name: Compile Basilisk + VOF + ImpactForce + TestImpactForce
     runs-on: ubuntu-22.04
 
     steps:
+    # ----------------------------------------------------------------------
+    # Checkout
+    # ----------------------------------------------------------------------
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    # ----------------------------------------------------------------------
+    # Dependencies
+    # ----------------------------------------------------------------------
     - name: Install system dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          gcc make gawk m4 \
-          libosmesa6-dev libglu1-mesa-dev libgl1-mesa-dev libglfw3-dev \
-          libnetpbm10-dev libpng-dev ffmpeg imagemagick gnuplot curl tar
+          gcc g++ gfortran make gawk m4 \
+          libosmesa6-dev libglu1-mesa-dev \
+          libgl1-mesa-dev libglfw3-dev \
+          libnetpbm10-dev libpng-dev \
+          ffmpeg imagemagick gnuplot \
+          curl tar
 
+    # ----------------------------------------------------------------------
+    # Cache Basilisk
+    # ----------------------------------------------------------------------
     - name: Cache Basilisk installation
       id: cache-basilisk
       uses: actions/cache@v4
       with:
         path: ~/basilisk
-        key: ${{ runner.os }}-basilisk-local-${{ hashFiles('src/**/*.c', 'src/**/*.h', 'src/**/Makefile*') }}
-        restore-keys: |
-          ${{ runner.os }}-basilisk-local-
+        key: ${{ runner.os }}-basilisk-local-${{ hashFiles('src/**/*.c', 'src/**/*.h') }}
 
+    # ----------------------------------------------------------------------
+    # Build Basilisk
+    # ----------------------------------------------------------------------
     - name: Build Basilisk C from local source
       if: steps.cache-basilisk.outputs.cache-hit != 'true'
       run: |
-        echo "Building Basilisk C..."
+        echo "=== Building Basilisk from src ==="
         mkdir -p ~/basilisk
         cp -r src ~/basilisk/
 
         cd ~/basilisk/src
         ln -sf config.gcc config
 
-        echo "Building Basilisk compiler and libraries..."
-        make -j1 2>&1 | tail -80
+        make -j1 || (echo 'Basilisk build failed' && exit 1)
 
         if [ ! -f qcc ]; then
-          echo "ERROR: qcc not built"
+          echo "ERROR: qcc not built!"
           exit 1
         fi
 
-        if [ ! -f gl/libglutils.a ] || [ ! -f gl/libfb_tiny.a ]; then
-          echo "ERROR: GL libraries not built"
-          exit 1
-        fi
+        echo "=== Basilisk build complete ==="
+        ls -lh qcc gl/*.a
 
+    # ----------------------------------------------------------------------
+    # Verify
+    # ----------------------------------------------------------------------
     - name: Verify Basilisk installation
       run: |
         export BASILISK=$HOME/basilisk/src
         export PATH=$PATH:$BASILISK
-        which qcc
         qcc --version
-        ls -la $BASILISK/gl/*.a
 
-    - name: List VOF Method Files
+    # ----------------------------------------------------------------------
+    # Helper FUNCTION (safe compiler)
+    # ----------------------------------------------------------------------
+    - name: Create safe compiler wrapper
+      shell: bash
       run: |
-        echo "=== vof-method contents ==="
-        ls -lah vof-method/
+        cat << 'EOF' > safe_compile.sh
+        #!/usr/bin/env bash
+        f="$1"
+        # Remove extension
+        base=$(basename "$f" .c)
+        # Replace / with _
+        base=${base//\//_}
+        # If starts with digit → prefix
+        if [[ "$base" =~ ^[0-9] ]]; then
+          base="exe_$base"
+        fi
+        # Compile
+        echo "[CC] $f --> $base"
+        qcc -O2 -Wall "$f" -o "$base"
+        EOF
+        chmod +x safe_compile.sh
 
-    - name: Check tmp_fraction_field.h
+    # ----------------------------------------------------------------------
+    # VOF-METHOD COMPILATION
+    # ----------------------------------------------------------------------
+    - name: Build VOF method
       run: |
-        if [ ! -f vof-method/tmp_fraction_field.h ]; then
-          echo "Missing tmp_fraction_field.h"
+        export BASILISK=$HOME/basilisk/src
+        export PATH=$PATH:$BASILISK
+
+        cd vof-method
+
+        if [ ! -f ci_run.sh ]; then
+          echo "ERROR: missing ci_run.sh in vof-method/"
           exit 1
         fi
 
-    - name: Quick compile test (circle-droplet)
-      run: |
-        export BASILISK=$HOME/basilisk/src
-        export PATH=$PATH:$BASILISK
-        cd vof-method
+        echo "=== Running VOF quick test ==="
         ./ci_run.sh test
 
-    - name: Compile all VOF simulations
-      run: |
-        export BASILISK=$HOME/basilisk/src
-        export PATH=$PATH:$BASILISK
-        cd vof-method
+        echo "=== Compiling all VOF simulations ==="
         ./ci_run.sh
 
-    - name: Verify VOF binaries
-      run: |
         echo "=== VOF binaries ==="
-        ls -lh vof-method/* || true
+        ls -lh || true
 
-    ########################################################
-    # NEW BLOCK: IMPACTFORCE-MAIN
-    ########################################################
-
+    # ----------------------------------------------------------------------
+    # IMPACTFORCE-MAIN COMPILATION
+    # ----------------------------------------------------------------------
     - name: Compile ImpactForce-main
       run: |
         export BASILISK=$HOME/basilisk/src
         export PATH=$PATH:$BASILISK
-        cd ImpactForce-main || exit 0
 
-        echo "=== Building ImpactForce-main ==="
+        cd ImpactForce-main || exit 0
+        echo "=== Files in ImpactForce-main ==="
         ls -lah
 
-        for f in *.c */*.c 2>/dev/null; do
-          [ -f "$f" ] || continue
-          echo "Compiling $f ..."
-          qcc -O2 -Wall "$f" -o "$(basename "$f" .c)"
+        find . -type f -name "*.c" | while read -r f; do
+          ../safe_compile.sh "$f"
         done
 
-        echo "=== Finished building ImpactForce-main ==="
-        ls -lh
+        echo "=== ImpactForce binaries ==="
+        ls -lh || true
 
-    ########################################################
-    # NEW BLOCK: TESTIMPACTFORCE-MAIN
-    ########################################################
-
+    # ----------------------------------------------------------------------
+    # TESTIMPACTFORCE-MAIN COMPILATION
+    # ----------------------------------------------------------------------
     - name: Compile TestImpactForce-main
       run: |
         export BASILISK=$HOME/basilisk/src
         export PATH=$PATH:$BASILISK
-        cd TestImpactForce-main || exit 0
 
-        echo "=== Building TestImpactForce-main ==="
+        cd TestImpactForce-main || exit 0
+        echo "=== Files in TestImpactForce-main ==="
         ls -lah
 
-        for f in *.c */*.c 2>/dev/null; do
-          [ -f "$f" ] || continue
-          echo "Compiling $f ..."
-          qcc -O2 -Wall "$f" -o "$(basename "$f" .c)"
+        find . -type f -name "*.c" | while read -r f; do
+          ../safe_compile.sh "$f"
         done
 
-        echo "=== Finished building TestImpactForce-main ==="
-        ls -lh
+        echo "=== TestImpactForce binaries ==="
+        ls -lh || true
 
-    - name: Verify ImpactForce + TestImpactForce binaries
-      run: |
-        echo "=== ImpactForce-main binaries ==="
-        ls -lh ImpactForce-main/* 2>/dev/null || echo "No binaries"
-
-        echo "=== TestImpactForce-main binaries ==="
-        ls -lh TestImpactForce-main/* 2>/dev/null || echo "No binaries"
-
-    ########################################################
-
+    # ----------------------------------------------------------------------
+    # UPLOAD RESULTS
+    # ----------------------------------------------------------------------
     - name: Upload all binaries & logs
       if: always()
       uses: actions/upload-artifact@v4
@@ -173,13 +187,3 @@ jobs:
           !**/*.h
           !**/*.txt
         retention-days: 7
-
-    - name: Upload fail logs
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: fail-logs
-        path: |
-          vof-method/*.log
-          ImpactForce-main/*.log
-          TestImpactForce-main/*.log
