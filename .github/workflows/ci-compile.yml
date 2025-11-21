@@ -1,6 +1,5 @@
 name: Basilisk VOF Method - Minimal Compilation CI
 
-# Trigger on push/PR for code that matters
 on:
   push:
     branches: [ main, fix/vof-method-compile, 'claude/**' ]
@@ -26,7 +25,6 @@ jobs:
     timeout-minutes: 60
 
     env:
-      # base locations
       BASILISK_ROOT: ${{ runner.home }}/basilisk
       BASILISK_SRC: ${{ runner.home }}/basilisk/src
 
@@ -45,26 +43,17 @@ jobs:
           libnetpbm10-dev libpng-dev ffmpeg imagemagick gnuplot curl tar \
           pkg-config
 
-    - name: Prepare Basilisk cache key (short)
-      id: key
-      run: |
-        # create a stable key based on src tree (if present)
-        if [ -d src ]; then
-          KEY_SRC=$(git ls-files 'src/**' | sort | xargs sha1sum | sha1sum | awk '{print $1}')
-        else
-          KEY_SRC="no-src"
-        fi
-        echo "key=$KEY_SRC" > key.txt
-        cat key.txt
-
     - name: Cache Basilisk installation
       id: cache-basilisk
       uses: actions/cache@v4
       with:
+        # Use a key derived from all files under src to invalidate cache on source changes
+        key: ${{ runner.os }}-basilisk-local-${{ hashFiles('src/**') }}
         path: ${{ runner.home }}/basilisk
-        key: ${{ runner.os }}-basilisk-local-${{ steps.key.outputs.key || steps.key.outputs.key }} 
+        restore-keys: |
+          ${{ runner.os }}-basilisk-local-
 
-    # Build minimal Basilisk (only qcc) if cache miss
+    # Build minimal Basilisk (qcc) if cache miss
     - name: Build minimal Basilisk (qcc)
       if: steps.cache-basilisk.outputs.cache-hit != 'true'
       run: |
@@ -72,7 +61,6 @@ jobs:
         echo "=== Building minimal Basilisk into $BASILISK_ROOT ==="
         rm -rf "$BASILISK_ROOT"
         mkdir -p "$BASILISK_ROOT"
-        # copy repo src into basilisk workspace
         if [ -d src ]; then
           cp -r src "$BASILISK_ROOT/"
         else
@@ -81,18 +69,14 @@ jobs:
         fi
 
         cd "$BASILISK_SRC"
-        # make sure the config points to gcc build settings
         if [ -f config.gcc ]; then
           ln -sf config.gcc config
         fi
 
-        # Build only the compiler (qcc) and core modules necessary for compiling simulations.
-        # This avoids building GL/bview targets which require X/GL environment.
-        # Use single-threaded make to avoid race conditions in the upstream Makefiles.
+        # Build only the qcc target to avoid GUI/GL targets that require X.
         echo "Running: make -j1 qcc"
         make -j1 qcc
 
-        # Verify qcc
         if [ ! -x "$BASILISK_SRC/qcc" ]; then
           echo "ERROR: qcc was not built or is not executable." >&2
           ls -la "$BASILISK_SRC" || true
@@ -105,20 +89,14 @@ jobs:
         set -euo pipefail
         export BASILISK="$BASILISK_SRC"
         export PATH="$BASILISK:$PATH"
-
         echo "which qcc -> $(which qcc || echo 'not found')"
-        echo "qcc version (first lines):"
-        qcc --version 2>/dev/null || echo "qcc --version not available, but qcc exists: $(ls -la $BASILISK/qcc)"
+        qcc --version 2>/dev/null || echo "qcc exists at: $BASILISK/qcc"
 
-        # Create a safe qcc-wrapper to ensure BASILISK is passed to downstream compiles.
-        # This also normalizes invocation and logs the compile commands into a log file.
         cat > "$BASILISK_ROOT/qcc-wrapper.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 B="/home/runner/basilisk/src"
-# print the command to log (helpful for debugging)
 echo "QCC-WRAPPER: $B/qcc $@" 1>&2
-# run the real qcc
 exec "$B/qcc" "$@"
 EOF
         chmod +x "$BASILISK_ROOT/qcc-wrapper.sh"
@@ -134,7 +112,6 @@ EOF
         echo "=== vof-method listing ==="
         if [ -d vof-method ]; then
           ls -lah vof-method || true
-          echo "--- top-level C/H files ---"
           ls -1 vof-method/*.c 2>/dev/null || true
           ls -1 vof-method/*.h 2>/dev/null || true
         else
@@ -146,10 +123,8 @@ EOF
         set -euo pipefail
         export BASILISK=${{ env.BASILISK }}
         export PATH=${{ env.BASILISK }}:$PATH
-
         if [ -d vof-method ]; then
           cd vof-method
-          # prefer the ci_run.sh harness if present
           if [ -x ./ci_run.sh ]; then
             echo "Found vof-method/ci_run.sh -> running quick test 'test'"
             ./ci_run.sh test || { echo "ci_run.sh test failed"; exit 1; }
@@ -167,23 +142,18 @@ EOF
           echo "No vof-method directory, skipping VOF step"
         fi
 
-    - name: Compile all VOF simulations (full)
+    - name: Compile all VOF simulations (full run - nonfatal)
       run: |
         set -euo pipefail
         export BASILISK=${{ env.BASILISK }}
         export PATH=${{ env.BASILISK }}:$PATH
-
         if [ -d vof-method ]; then
           cd vof-method
-          # run full harness without failing the job on minor test-case runtime errors
           if [ -x ./ci_run.sh ]; then
-            echo "Running vof-method/ci_run.sh (full run)"
             ./ci_run.sh || echo "ci_run.sh returned non-zero (continue to attempt binary collection)"
           else
-            echo "No ci_run.sh — previous step compiled individual binaries"
+            echo "No ci_run.sh — skipped full harness"
           fi
-        else
-          echo "No vof-method directory, skipping"
         fi
 
     - name: Verify VOF binaries (non-fatal)
@@ -195,57 +165,36 @@ EOF
           echo "No vof-method"
         fi
 
-    #################################################################
-    # ImpactForce-main compile (safe, minimal; skip if folder missing)
-    #################################################################
     - name: Compile ImpactForce-main (if present)
       run: |
         set -euo pipefail
         export BASILISK=${{ env.BASILISK }}
         export PATH=${{ env.BASILISK }}:$PATH
-
         if [ ! -d ImpactForce-main ]; then
           echo "ImpactForce-main folder not found - skipping."
           exit 0
         fi
-
         cd ImpactForce-main
-        echo "Listing ImpactForce-main"
-        ls -lah
-
-        # compile top-level C files and files under src/
         mkdir -p build-impactforce
-        echo "Compiling C sources with qcc-wrapper..."
         find . -maxdepth 3 -type f -name '*.c' | sort | while read -r f; do
           bn=$(basename "$f" .c)
           echo "Compiling $f -> build-impactforce/$bn"
-          # if qcc fails, capture logs per-file
           if ! "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build-impactforce/"$bn" "$f" 2> build-impactforce/"$bn".compile.log; then
             echo "Compilation failed for $f (see build-impactforce/$bn.compile.log)"
           fi
         done
-
-        echo "ImpactForce-main compile complete. output:"
         ls -lah build-impactforce || true
 
-    #################################################################
-    # TestImpactForce-main compile (safe, minimal; skip if folder missing)
-    #################################################################
     - name: Compile TestImpactForce-main (if present)
       run: |
         set -euo pipefail
         export BASILISK=${{ env.BASILISK }}
         export PATH=${{ env.BASILISK }}:$PATH
-
         if [ ! -d TestImpactForce-main ]; then
           echo "TestImpactForce-main folder not found - skipping."
           exit 0
         fi
-
         cd TestImpactForce-main
-        echo "Listing TestImpactForce-main"
-        ls -lah
-
         mkdir -p build-testimpact
         find . -maxdepth 2 -type f -name '*.c' | sort | while read -r f; do
           bn=$(basename "$f" .c)
@@ -254,41 +203,30 @@ EOF
             echo "Compilation failed for $f (see build-testimpact/$bn.compile.log)"
           fi
         done
-
-        echo "TestImpactForce-main compile complete. output:"
         ls -lah build-testimpact || true
 
     - name: Collect compiled artifacts and logs
       if: always()
       run: |
-        echo "Collecting artifacts to /tmp/ci-artifacts"
+        set -euo pipefail
         rm -rf /tmp/ci-artifacts
         mkdir -p /tmp/ci-artifacts
 
-        # VOF
-        if [ -d vof-method ]; then
-          if [ -d vof-method/build ]; then
-            cp -a vof-method/build /tmp/ci-artifacts/vof-method-build || true
-          else
-            find vof-method -maxdepth 2 -type f -executable -print0 | xargs -0 -I{} cp {} /tmp/ci-artifacts/ || true
-          fi
+        if [ -d vof-method/build ]; then
+          cp -a vof-method/build /tmp/ci-artifacts/vof-method-build || true
+        else
+          find vof-method -maxdepth 2 -type f -executable -print0 2>/dev/null | xargs -0 -I{} cp {} /tmp/ci-artifacts/ 2>/dev/null || true
         fi
 
-        # ImpactForce
         if [ -d ImpactForce-main/build-impactforce ]; then
           cp -a ImpactForce-main/build-impactforce /tmp/ci-artifacts/ImpactForce-build || true
         fi
 
-        # TestImpactForce
         if [ -d TestImpactForce-main/build-testimpact ]; then
           cp -a TestImpactForce-main/build-testimpact /tmp/ci-artifacts/TestImpactForce-build || true
         fi
 
-        # Always include compile logs for diagnosis
         find . -type f -name '*.compile.log' -print0 | xargs -0 -I{} cp --parents {} /tmp/ci-artifacts/ || true
-
-        # Basic lists
-        echo "ls -R /tmp/ci-artifacts"
         ls -R /tmp/ci-artifacts || true
 
     - name: Upload compiled binaries & logs
@@ -303,6 +241,7 @@ EOF
       if: always()
       uses: actions/cache@v4
       with:
+        key: ${{ runner.os }}-basilisk-local-${{ hashFiles('src/**') }}
         path: ${{ runner.home }}/basilisk
-        key: ${{ runner.os }}-basilisk-local-${{ steps.key.outputs.key || steps.key.outputs.key }}
+
 
