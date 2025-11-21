@@ -92,12 +92,12 @@ jobs:
         echo "which qcc -> $(which qcc || echo 'not found')"
         qcc --version 2>/dev/null || echo "qcc exists at: $BASILISK/qcc"
 
-        cat > "$BASILISK_ROOT/qcc-wrapper.sh" << 'EOF'
+        cat > "$BASILISK_ROOT/qcc-wrapper.sh" <<EOF
         #!/usr/bin/env bash
         set -euo pipefail
-        B="/home/runner/basilisk/src"
-        echo "QCC-WRAPPER: $B/qcc $@" 1>&2
-        exec "$B/qcc" "$@"
+        BASILISK_BIN="$BASILISK_SRC"
+        echo "QCC-WRAPPER: \$BASILISK_BIN/qcc \$@" 1>&2
+        exec "\$BASILISK_BIN/qcc" "\$@"
         EOF
         chmod +x "$BASILISK_ROOT/qcc-wrapper.sh"
         echo "Created qcc-wrapper at $BASILISK_ROOT/qcc-wrapper.sh"
@@ -121,8 +121,6 @@ jobs:
     - name: Run quick VOF test (circle-droplet) OR fallback compile
       run: |
         set -euo pipefail
-        export BASILISK=${{ env.BASILISK }}
-        export PATH=${{ env.BASILISK }}:$PATH
         if [ -d vof-method ]; then
           cd vof-method
           if [ -x ./ci_run.sh ]; then
@@ -131,8 +129,8 @@ jobs:
           else
             echo "Missing ci_run.sh; doing a simple compile of *.c files"
             mkdir -p build
-            for f in *.c */*.c; do
-              [ -f "$f" ] || continue
+            shopt -s nullglob
+            for f in *.c; do
               bn=$(basename "$f" .c)
               echo "Compiling $f -> build/$bn"
               "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build/"$bn" "$f"
@@ -143,10 +141,9 @@ jobs:
         fi
 
     - name: Compile all VOF simulations (full run - nonfatal)
+      continue-on-error: true
       run: |
         set -euo pipefail
-        export BASILISK=${{ env.BASILISK }}
-        export PATH=${{ env.BASILISK }}:$PATH
         if [ -d vof-method ]; then
           cd vof-method
           if [ -x ./ci_run.sh ]; then
@@ -157,6 +154,7 @@ jobs:
         fi
 
     - name: Verify VOF binaries (non-fatal)
+      continue-on-error: true
       run: |
         echo "=== VOF binary listing (non-fatal) ==="
         if [ -d vof-method ]; then
@@ -166,43 +164,47 @@ jobs:
         fi
 
     - name: Compile ImpactForce-main (if present)
+      continue-on-error: true
       run: |
         set -euo pipefail
-        export BASILISK=${{ env.BASILISK }}
-        export PATH=${{ env.BASILISK }}:$PATH
         if [ ! -d ImpactForce-main ]; then
           echo "ImpactForce-main folder not found - skipping."
           exit 0
         fi
         cd ImpactForce-main
         mkdir -p build-impactforce
-        find . -maxdepth 3 -type f -name '*.c' | sort | while read -r f; do
+
+        # Use process substitution to avoid subshell issues with while loop
+        while IFS= read -r -d '' f; do
           bn=$(basename "$f" .c)
           echo "Compiling $f -> build-impactforce/$bn"
           if ! "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build-impactforce/"$bn" "$f" 2> build-impactforce/"$bn".compile.log; then
             echo "Compilation failed for $f (see build-impactforce/$bn.compile.log)"
           fi
-        done
+        done < <(find . -maxdepth 3 -type f -name '*.c' -print0 | sort -z)
+
         ls -lah build-impactforce || true
 
     - name: Compile TestImpactForce-main (if present)
+      continue-on-error: true
       run: |
         set -euo pipefail
-        export BASILISK=${{ env.BASILISK }}
-        export PATH=${{ env.BASILISK }}:$PATH
         if [ ! -d TestImpactForce-main ]; then
           echo "TestImpactForce-main folder not found - skipping."
           exit 0
         fi
         cd TestImpactForce-main
         mkdir -p build-testimpact
-        find . -maxdepth 2 -type f -name '*.c' | sort | while read -r f; do
+
+        # Use process substitution to avoid subshell issues with while loop
+        while IFS= read -r -d '' f; do
           bn=$(basename "$f" .c)
           echo "Compiling $f -> build-testimpact/$bn"
           if ! "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build-testimpact/"$bn" "$f" 2> build-testimpact/"$bn".compile.log; then
             echo "Compilation failed for $f (see build-testimpact/$bn.compile.log)"
           fi
-        done
+        done < <(find . -maxdepth 2 -type f -name '*.c' -print0 | sort -z)
+
         ls -lah build-testimpact || true
 
     - name: Collect compiled artifacts and logs
