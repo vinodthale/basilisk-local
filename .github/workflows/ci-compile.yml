@@ -1,34 +1,35 @@
-name: Basilisk VOF Method - Minimal Compilation CI
+name: Basilisk VOF Method – Minimal Compilation CI
 
 on:
   push:
-    branches: [ main, fix/vof-method-compile, 'claude/**' ]
+    branches: [ main, fix/vof-method-compile, "claude/**" ]
     paths:
-      - 'vof-method/**'
-      - 'ImpactForce-main/**'
-      - 'TestImpactForce-main/**'
-      - 'src/**'
-      - '.github/workflows/ci-compile.yml'
+      - "vof-method/**"
+      - "ImpactForce-main/**"
+      - "TestImpactForce-main/**"
+      - "src/**"
+      - ".github/workflows/ci-compile.yml"
   pull_request:
     branches: [ main ]
     paths:
-      - 'vof-method/**'
-      - 'ImpactForce-main/**'
-      - 'TestImpactForce-main/**'
-      - 'src/**'
-      - '.github/workflows/ci-compile.yml'
+      - "vof-method/**"
+      - "ImpactForce-main/**"
+      - "TestImpactForce-main/**"
+      - "src/**"
+      - ".github/workflows/ci-compile.yml"
 
 jobs:
-  compile-vof-method:
-    name: Compile minimal Basilisk + VOF + ImpactForce + TestImpactForce
+  compile:
+    name: Build Basilisk + VOF + ImpactForce + TestImpactForce
     runs-on: ubuntu-22.04
     timeout-minutes: 60
 
     env:
-      BASILISK_ROOT: $HOME/basilisk
-      BASILISK_SRC: $HOME/basilisk/src
+      BASILISK_ROOT: /home/runner/basilisk
+      BASILISK_SRC: /home/runner/basilisk/src
 
     steps:
+
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
@@ -38,61 +39,66 @@ jobs:
       run: |
         sudo apt-get update -y
         sudo apt-get install -y --no-install-recommends \
-          gcc g++ make gawk m4 ca-certificates \
+          gcc g++ make gawk m4 pkg-config ca-certificates \
           libosmesa6-dev libglu1-mesa-dev libgl1-mesa-dev libglfw3-dev \
-          libnetpbm10-dev libpng-dev ffmpeg imagemagick gnuplot curl tar \
-          pkg-config
+          libnetpbm10-dev libpng-dev ffmpeg imagemagick gnuplot curl tar
 
     - name: Cache Basilisk installation
       id: cache-basilisk
       uses: actions/cache@v4
       with:
-        key: ${{ runner.os }}-basilisk-local-${{ hashFiles('src/**') }}
-        path: $HOME/basilisk
+        key: ${{ runner.os }}-basilisk-${{ hashFiles('src/**') }}
+        path: /home/runner/basilisk
         restore-keys: |
-          ${{ runner.os }}-basilisk-local-
+          ${{ runner.os }}-basilisk-
 
-    - name: Build minimal Basilisk (qcc)
+    - name: Build minimal Basilisk (qcc only)
       if: steps.cache-basilisk.outputs.cache-hit != 'true'
       run: |
         set -euo pipefail
         rm -rf "$BASILISK_ROOT"
         mkdir -p "$BASILISK_ROOT"
+
         cp -r src "$BASILISK_ROOT/"
+
         cd "$BASILISK_SRC"
         ln -sf config.gcc config
+
+        echo "Building qcc (ONLY)..."
         make -j1 qcc
+
         if [ ! -x qcc ]; then
-          echo "ERROR: qcc not built"
+          echo "ERROR: qcc did not build."
           exit 1
         fi
 
-    - name: Verify Basilisk installation and create safe wrapper
+    - name: Create qcc wrapper & export environment
       run: |
         set -euo pipefail
-        export BASILISK="$BASILISK_SRC"
-        export PATH="$BASILISK:$PATH"
 
         cat > "$BASILISK_ROOT/qcc-wrapper.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-BASILISK_BIN="${BASILISK:-$HOME/basilisk/src}"
+BASILISK_BIN="${BASILISK:-/home/runner/basilisk/src}"
 exec "$BASILISK_BIN/qcc" "$@"
 EOF
         chmod +x "$BASILISK_ROOT/qcc-wrapper.sh"
 
         echo "BASILISK=$BASILISK_SRC" >> $GITHUB_ENV
-        echo "BASILISK_ROOT=$BASILISK_ROOT" >> $GITHUB_ENV
         echo "BASILISK_SRC=$BASILISK_SRC" >> $GITHUB_ENV
+        echo "BASILISK_ROOT=$BASILISK_ROOT" >> $GITHUB_ENV
         echo "PATH=$BASILISK_SRC:$PATH" >> $GITHUB_ENV
 
-    - name: List VOF method files (if present)
+    - name: List VOF method files
       run: |
         if [ -d vof-method ]; then
+          echo "VOF directory exists:"
           ls -lah vof-method
+        else
+          echo "VOF directory missing!"
         fi
 
-    - name: Run quick VOF test
+    - name: Quick VOF test (circle-droplet)
       run: |
         if [ -d vof-method ]; then
           cd vof-method
@@ -102,7 +108,7 @@ EOF
             mkdir -p build
             for f in *.c; do
               bn=$(basename "$f" .c)
-              "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build/"$bn" "$f"
+              "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build/$bn $f
             done
           fi
         fi
@@ -118,7 +124,8 @@ EOF
     - name: Verify VOF binaries
       continue-on-error: true
       run: |
-        ls -lh vof-method/build/* 2>/dev/null || ls -lh vof-method/* 2>/dev/null || true
+        echo "Listing binaries..."
+        ls -lh vof-method/build/* 2>/dev/null || true
 
     - name: Compile ImpactForce-main
       continue-on-error: true
@@ -126,11 +133,12 @@ EOF
         if [ -d ImpactForce-main ]; then
           cd ImpactForce-main
           mkdir -p build-impactforce
-          find . -maxdepth 3 -type f -name '*.c' -print0 | while IFS= read -r -d '' f; do
-            bn=$(basename "$f" .c)
-            "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build-impactforce/"$bn" "$f" \
-              2> build-impactforce/"$bn".compile.log || true
-          done
+          find . -maxdepth 3 -type f -name "*.c" -print0 |
+            while IFS= read -r -d '' f; do
+              bn=$(basename "$f" .c)
+              "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build-impactforce/$bn "$f" \
+                2> build-impactforce/$bn.compile.log || true
+            done
         fi
 
     - name: Compile TestImpactForce-main
@@ -139,29 +147,31 @@ EOF
         if [ -d TestImpactForce-main ]; then
           cd TestImpactForce-main
           mkdir -p build-testimpact
-          find . -maxdepth 2 -type f -name '*.c' -print0 | while IFS= read -r -d '' f; do
-            bn=$(basename "$f" .c)
-            "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build-testimpact/"$bn" "$f" \
-              2> build-testimpact/"$bn".compile.log || true
-          done
+          find . -maxdepth 2 -type f -name "*.c" -print0 |
+            while IFS= read -r -d '' f; do
+              bn=$(basename "$f" .c)
+              "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build-testimpact/$bn "$f" \
+                2> build-testimpact/$bn.compile.log || true
+            done
         fi
 
-    - name: Collect compiled artifacts and logs
+    - name: Collect artifacts
       if: always()
       run: |
         rm -rf /tmp/ci-artifacts
         mkdir -p /tmp/ci-artifacts
-        cp -a vof-method/build /tmp/ci-artifacts/vof-method 2>/dev/null || true
-        cp -a ImpactForce-main/build-impactforce /tmp/ci-artifacts/impactforce 2>/dev/null || true
-        cp -a TestImpactForce-main/build-testimpact /tmp/ci-artifacts/testimpact 2>/dev/null || true
-        find . -type f -name '*.compile.log' -exec cp {} /tmp/ci-artifacts/ \;
 
-    - name: Upload compiled binaries & logs
+        cp -a vof-method/build /tmp/ci-artifacts/vof 2>/dev/null || true
+        cp -a ImpactForce-main/build-impactforce /tmp/ci-artifacts/impact 2>/dev/null || true
+        cp -a TestImpactForce-main/build-testimpact /tmp/ci-artifacts/test 2>/dev/null || true
+
+        find . -type f -name "*.compile.log" -exec cp {} /tmp/ci-artifacts/ \; || true
+
+    - name: Upload artifacts
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: compiled-binaries
         path: /tmp/ci-artifacts
         retention-days: 7
-
 
