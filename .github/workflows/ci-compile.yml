@@ -92,19 +92,22 @@ jobs:
         echo "which qcc -> $(which qcc || echo 'not found')"
         qcc --version 2>/dev/null || echo "qcc exists at: $BASILISK/qcc"
 
-        cat > "$BASILISK_ROOT/qcc-wrapper.sh" <<EOF
-        #!/usr/bin/env bash
-        set -euo pipefail
-        BASILISK_BIN="$BASILISK_SRC"
-        echo "QCC-WRAPPER: \$BASILISK_BIN/qcc \$@" 1>&2
-        exec "\$BASILISK_BIN/qcc" "\$@"
-        EOF
+        cat > "$BASILISK_ROOT/qcc-wrapper.sh" <<'WRAPPER_EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+# Use BASILISK from environment, or fall back to hardcoded path
+BASILISK_BIN="${BASILISK:-/home/runner/basilisk/src}"
+echo "QCC-WRAPPER: $BASILISK_BIN/qcc $@" 1>&2
+exec "$BASILISK_BIN/qcc" "$@"
+WRAPPER_EOF
         chmod +x "$BASILISK_ROOT/qcc-wrapper.sh"
         echo "Created qcc-wrapper at $BASILISK_ROOT/qcc-wrapper.sh"
 
     - name: Export BASILISK env for subsequent steps
       run: |
         echo "BASILISK=$BASILISK_SRC" >> $GITHUB_ENV
+        echo "BASILISK_ROOT=$BASILISK_ROOT" >> $GITHUB_ENV
+        echo "BASILISK_SRC=$BASILISK_SRC" >> $GITHUB_ENV
         echo "PATH=$BASILISK_SRC:$PATH" >> $GITHUB_ENV
 
     - name: List VOF method files (if present)
