@@ -47,64 +47,40 @@ jobs:
       id: cache-basilisk
       uses: actions/cache@v4
       with:
-        # Use a key derived from all files under src to invalidate cache on source changes
         key: ${{ runner.os }}-basilisk-local-${{ hashFiles('src/**') }}
         path: $HOME/basilisk
         restore-keys: |
           ${{ runner.os }}-basilisk-local-
 
-    # Build minimal Basilisk (qcc) if cache miss
     - name: Build minimal Basilisk (qcc)
       if: steps.cache-basilisk.outputs.cache-hit != 'true'
       run: |
         set -euo pipefail
-        echo "=== Building minimal Basilisk into $BASILISK_ROOT ==="
         rm -rf "$BASILISK_ROOT"
         mkdir -p "$BASILISK_ROOT"
-        if [ -d src ]; then
-          cp -r src "$BASILISK_ROOT/"
-        else
-          echo "No 'src' directory found in repo. Nothing to build for Basilisk." >&2
-          exit 1
-        fi
-
+        cp -r src "$BASILISK_ROOT/"
         cd "$BASILISK_SRC"
-        if [ -f config.gcc ]; then
-          ln -sf config.gcc config
-        fi
-
-        # Build only the qcc target to avoid GUI/GL targets that require X.
-        echo "Running: make -j1 qcc"
+        ln -sf config.gcc config
         make -j1 qcc
-
-        if [ ! -x "$BASILISK_SRC/qcc" ]; then
-          echo "ERROR: qcc was not built or is not executable." >&2
-          ls -la "$BASILISK_SRC" || true
+        if [ ! -x qcc ]; then
+          echo "ERROR: qcc not built"
           exit 1
         fi
-        echo "qcc built successfully at $BASILISK_SRC/qcc"
 
     - name: Verify Basilisk installation and create safe wrapper
       run: |
         set -euo pipefail
         export BASILISK="$BASILISK_SRC"
         export PATH="$BASILISK:$PATH"
-        echo "which qcc -> $(which qcc || echo 'not found')"
-        qcc --version 2>/dev/null || echo "qcc exists at: $BASILISK/qcc"
 
-        cat > "$BASILISK_ROOT/qcc-wrapper.sh" <<'WRAPPER_EOF'
+        cat > "$BASILISK_ROOT/qcc-wrapper.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-# Use BASILISK from environment, or fall back to hardcoded path
 BASILISK_BIN="${BASILISK:-$HOME/basilisk/src}"
-echo "QCC-WRAPPER: $BASILISK_BIN/qcc $@" 1>&2
 exec "$BASILISK_BIN/qcc" "$@"
-WRAPPER_EOF
+EOF
         chmod +x "$BASILISK_ROOT/qcc-wrapper.sh"
-        echo "Created qcc-wrapper at $BASILISK_ROOT/qcc-wrapper.sh"
 
-    - name: Export BASILISK env for subsequent steps
-      run: |
         echo "BASILISK=$BASILISK_SRC" >> $GITHUB_ENV
         echo "BASILISK_ROOT=$BASILISK_ROOT" >> $GITHUB_ENV
         echo "BASILISK_SRC=$BASILISK_SRC" >> $GITHUB_ENV
@@ -112,127 +88,73 @@ WRAPPER_EOF
 
     - name: List VOF method files (if present)
       run: |
-        echo "=== vof-method listing ==="
         if [ -d vof-method ]; then
-          ls -lah vof-method || true
-          ls -1 vof-method/*.c 2>/dev/null || true
-          ls -1 vof-method/*.h 2>/dev/null || true
-        else
-          echo "vof-method directory not present — skipping listing"
+          ls -lah vof-method
         fi
 
-    - name: Run quick VOF test (circle-droplet) OR fallback compile
+    - name: Run quick VOF test
       run: |
-        set -euo pipefail
         if [ -d vof-method ]; then
           cd vof-method
           if [ -x ./ci_run.sh ]; then
-            echo "Found vof-method/ci_run.sh -> running quick test 'test'"
-            ./ci_run.sh test || { echo "ci_run.sh test failed"; exit 1; }
+            ./ci_run.sh test
           else
-            echo "Missing ci_run.sh; doing a simple compile of *.c files"
             mkdir -p build
-            shopt -s nullglob
             for f in *.c; do
               bn=$(basename "$f" .c)
-              echo "Compiling $f -> build/$bn"
               "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build/"$bn" "$f"
             done
           fi
-        else
-          echo "No vof-method directory, skipping VOF step"
         fi
 
-    - name: Compile all VOF simulations (full run - nonfatal)
+    - name: Compile all VOF simulations
       continue-on-error: true
       run: |
-        set -euo pipefail
-        if [ -d vof-method ]; then
+        if [ -d vof-method ] && [ -x vof-method/ci_run.sh ]; then
           cd vof-method
-          if [ -x ./ci_run.sh ]; then
-            ./ci_run.sh || echo "ci_run.sh returned non-zero (continue to attempt binary collection)"
-          else
-            echo "No ci_run.sh — skipped full harness"
-          fi
+          ./ci_run.sh || true
         fi
 
-    - name: Verify VOF binaries (non-fatal)
+    - name: Verify VOF binaries
       continue-on-error: true
       run: |
-        echo "=== VOF binary listing (non-fatal) ==="
-        if [ -d vof-method ]; then
-          ls -lh vof-method/build/* 2>/dev/null || ls -lh vof-method/* 2>/dev/null || echo "No VOF binaries found"
-        else
-          echo "No vof-method"
-        fi
+        ls -lh vof-method/build/* 2>/dev/null || ls -lh vof-method/* 2>/dev/null || true
 
-    - name: Compile ImpactForce-main (if present)
+    - name: Compile ImpactForce-main
       continue-on-error: true
       run: |
-        set -euo pipefail
-        if [ ! -d ImpactForce-main ]; then
-          echo "ImpactForce-main folder not found - skipping."
-          exit 0
+        if [ -d ImpactForce-main ]; then
+          cd ImpactForce-main
+          mkdir -p build-impactforce
+          find . -maxdepth 3 -type f -name '*.c' -print0 | while IFS= read -r -d '' f; do
+            bn=$(basename "$f" .c)
+            "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build-impactforce/"$bn" "$f" \
+              2> build-impactforce/"$bn".compile.log || true
+          done
         fi
-        cd ImpactForce-main
-        mkdir -p build-impactforce
 
-        # Use process substitution to avoid subshell issues with while loop
-        while IFS= read -r -d '' f; do
-          bn=$(basename "$f" .c)
-          echo "Compiling $f -> build-impactforce/$bn"
-          if ! "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build-impactforce/"$bn" "$f" 2> build-impactforce/"$bn".compile.log; then
-            echo "Compilation failed for $f (see build-impactforce/$bn.compile.log)"
-          fi
-        done < <(find . -maxdepth 3 -type f -name '*.c' -print0 | sort -z)
-
-        ls -lah build-impactforce || true
-
-    - name: Compile TestImpactForce-main (if present)
+    - name: Compile TestImpactForce-main
       continue-on-error: true
       run: |
-        set -euo pipefail
-        if [ ! -d TestImpactForce-main ]; then
-          echo "TestImpactForce-main folder not found - skipping."
-          exit 0
+        if [ -d TestImpactForce-main ]; then
+          cd TestImpactForce-main
+          mkdir -p build-testimpact
+          find . -maxdepth 2 -type f -name '*.c' -print0 | while IFS= read -r -d '' f; do
+            bn=$(basename "$f" .c)
+            "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build-testimpact/"$bn" "$f" \
+              2> build-testimpact/"$bn".compile.log || true
+          done
         fi
-        cd TestImpactForce-main
-        mkdir -p build-testimpact
-
-        # Use process substitution to avoid subshell issues with while loop
-        while IFS= read -r -d '' f; do
-          bn=$(basename "$f" .c)
-          echo "Compiling $f -> build-testimpact/$bn"
-          if ! "$BASILISK_ROOT/qcc-wrapper.sh" -O2 -Wall -o build-testimpact/"$bn" "$f" 2> build-testimpact/"$bn".compile.log; then
-            echo "Compilation failed for $f (see build-testimpact/$bn.compile.log)"
-          fi
-        done < <(find . -maxdepth 2 -type f -name '*.c' -print0 | sort -z)
-
-        ls -lah build-testimpact || true
 
     - name: Collect compiled artifacts and logs
       if: always()
       run: |
-        set -euo pipefail
         rm -rf /tmp/ci-artifacts
         mkdir -p /tmp/ci-artifacts
-
-        if [ -d vof-method/build ]; then
-          cp -a vof-method/build /tmp/ci-artifacts/vof-method-build || true
-        else
-          find vof-method -maxdepth 2 -type f -executable -print0 2>/dev/null | xargs -0 -I{} cp {} /tmp/ci-artifacts/ 2>/dev/null || true
-        fi
-
-        if [ -d ImpactForce-main/build-impactforce ]; then
-          cp -a ImpactForce-main/build-impactforce /tmp/ci-artifacts/ImpactForce-build || true
-        fi
-
-        if [ -d TestImpactForce-main/build-testimpact ]; then
-          cp -a TestImpactForce-main/build-testimpact /tmp/ci-artifacts/TestImpactForce-build || true
-        fi
-
-        find . -type f -name '*.compile.log' -print0 | xargs -0 -I{} cp --parents {} /tmp/ci-artifacts/ || true
-        ls -R /tmp/ci-artifacts || true
+        cp -a vof-method/build /tmp/ci-artifacts/vof-method 2>/dev/null || true
+        cp -a ImpactForce-main/build-impactforce /tmp/ci-artifacts/impactforce 2>/dev/null || true
+        cp -a TestImpactForce-main/build-testimpact /tmp/ci-artifacts/testimpact 2>/dev/null || true
+        find . -type f -name '*.compile.log' -exec cp {} /tmp/ci-artifacts/ \;
 
     - name: Upload compiled binaries & logs
       if: always()
@@ -241,4 +163,5 @@ WRAPPER_EOF
         name: compiled-binaries
         path: /tmp/ci-artifacts
         retention-days: 7
+
 
