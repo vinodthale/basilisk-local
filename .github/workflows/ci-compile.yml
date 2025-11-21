@@ -92,13 +92,13 @@ jobs:
         echo "which qcc -> $(which qcc || echo 'not found')"
         qcc --version 2>/dev/null || echo "qcc exists at: $BASILISK/qcc"
 
-        cat > "$BASILISK_ROOT/qcc-wrapper.sh" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-B="/home/runner/basilisk/src"
-echo "QCC-WRAPPER: $B/qcc $@" 1>&2
-exec "$B/qcc" "$@"
-EOF
+        cat > "$BASILISK_ROOT/qcc-wrapper.sh" << 'EOF'
+        #!/usr/bin/env bash
+        set -euo pipefail
+        B="/home/runner/basilisk/src"
+        echo "QCC-WRAPPER: $B/qcc $@" 1>&2
+        exec "$B/qcc" "$@"
+        EOF
         chmod +x "$BASILISK_ROOT/qcc-wrapper.sh"
         echo "Created qcc-wrapper at $BASILISK_ROOT/qcc-wrapper.sh"
 
