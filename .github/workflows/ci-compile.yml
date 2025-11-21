@@ -131,7 +131,7 @@ EOF
           else
             echo "Missing ci_run.sh; doing a simple compile of *.c files"
             mkdir -p build
-            for f in *.c */*.c 2>/dev/null; do
+            for f in *.c */*.c; do
               [ -f "$f" ] || continue
               bn=$(basename "$f" .c)
               echo "Compiling $f -> build/$bn"
@@ -236,12 +236,4 @@ EOF
         name: compiled-binaries
         path: /tmp/ci-artifacts
         retention-days: 7
-
-    - name: Post-cache Basilisk (store to cache)
-      if: always()
-      uses: actions/cache@v4
-      with:
-        key: ${{ runner.os }}-basilisk-local-${{ hashFiles('src/**') }}
-        path: ${{ runner.home }}/basilisk
-
 
