@@ -67,6 +67,9 @@ jobs:
         echo "Building ast library..."
         make -C ast
 
+        echo "Building gl libraries (glutils, fb_tiny)..."
+        make -C gl
+
         echo "Building qcc..."
         make -j1 qcc
 
