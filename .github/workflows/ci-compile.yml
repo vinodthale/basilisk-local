@@ -25,8 +25,8 @@ jobs:
     timeout-minutes: 60
 
     env:
-      BASILISK_ROOT: ${{ runner.home }}/basilisk
-      BASILISK_SRC: ${{ runner.home }}/basilisk/src
+      BASILISK_ROOT: $HOME/basilisk
+      BASILISK_SRC: $HOME/basilisk/src
 
     steps:
     - name: Checkout repository
@@ -49,7 +49,7 @@ jobs:
       with:
         # Use a key derived from all files under src to invalidate cache on source changes
         key: ${{ runner.os }}-basilisk-local-${{ hashFiles('src/**') }}
-        path: ${{ runner.home }}/basilisk
+        path: $HOME/basilisk
         restore-keys: |
           ${{ runner.os }}-basilisk-local-
 
@@ -96,7 +96,7 @@ jobs:
 #!/usr/bin/env bash
 set -euo pipefail
 # Use BASILISK from environment, or fall back to hardcoded path
-BASILISK_BIN="${BASILISK:-/home/runner/basilisk/src}"
+BASILISK_BIN="${BASILISK:-$HOME/basilisk/src}"
 echo "QCC-WRAPPER: $BASILISK_BIN/qcc $@" 1>&2
 exec "$BASILISK_BIN/qcc" "$@"
 WRAPPER_EOF
