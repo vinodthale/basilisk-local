@@ -75,13 +75,12 @@ jobs:
     - name: Create qcc wrapper & export environment
       run: |
         set -euo pipefail
-
-        cat > "$BASILISK_ROOT/qcc-wrapper.sh" <<'EOF'
+        cat > "$BASILISK_ROOT/qcc-wrapper.sh" << 'QCC_WRAPPER'
 #!/usr/bin/env bash
 set -euo pipefail
 BASILISK_BIN="${BASILISK:-/home/runner/basilisk/src}"
 exec "$BASILISK_BIN/qcc" "$@"
-EOF
+QCC_WRAPPER
         chmod +x "$BASILISK_ROOT/qcc-wrapper.sh"
 
         echo "BASILISK=$BASILISK_SRC" >> $GITHUB_ENV
