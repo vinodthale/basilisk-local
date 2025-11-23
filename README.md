@@ -1,5 +1,8 @@
 # Basilisk
 
+[![License: GPL](https://img.shields.io/badge/License-GPL-blue.svg)](http://www.gnu.org/licenses/gpl-3.0)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20WSL-lightgrey.svg)](docs/INSTALLATION.md)
+
 Basilisk is a powerful computational fluid dynamics (CFD) solver framework for solving partial differential equations using adaptive mesh refinement and multiresolution algorithms on octree/quadtree grids.
 
 ## Overview
@@ -26,75 +29,39 @@ Basilisk provides a comprehensive suite of numerical solvers for simulating vari
 - **GPU Support**: Acceleration on graphics processing units
 - **Custom C Preprocessor**: The `qcc` compiler provides powerful domain-specific extensions
 
-## Installation
+## 🚀 Getting Started
 
-### Prerequisites
+### Quick Installation
 
-- C99-compliant compiler (GCC recommended)
-- GNU Make or compatible
-- Standard UNIX utilities (awk, sed, etc.)
+For detailed installation instructions, system requirements, and troubleshooting, see the **[Installation Guide](docs/INSTALLATION.md)**.
 
-### Optional Dependencies
-
-- `gnuplot` (>= 4.2) - for plotting
-- `imagemagick` - for image processing
-- `ffmpeg` - for video generation
-- `graphviz` - for visualization
-- `valgrind` - for debugging
-- `gifsicle` - for GIF animation
-- `SWIG` and Python development headers - for Python interface
-- `gfortran` - for optional Fortran libraries (GOTM, CVMix, PPR)
-
-On Debian/Ubuntu systems:
+**Quick start for Ubuntu/Debian:**
 
 ```bash
-sudo apt install build-essential gawk
-sudo apt install gnuplot imagemagick ffmpeg graphviz valgrind gifsicle pstoedit
+# Install dependencies
+sudo apt update
+sudo apt install -y build-essential gawk
+
+# Build Basilisk
+cd src
+ln -sf config.gcc config
+make -j$(nproc)
+
+# Set environment variables
+export BASILISK=$PWD
+export PATH=$PATH:$BASILISK
+echo "export BASILISK=$PWD" >> ~/.bashrc
+echo 'export PATH=$PATH:$BASILISK' >> ~/.bashrc
 ```
 
-### Building from Source
+### System Requirements
 
-1. Navigate to the source directory:
-   ```bash
-   cd src
-   ```
+- **OS**: Linux, macOS, or Windows (WSL2)
+- **Compiler**: GCC 4.9+ or Clang 3.5+ with C99 support
+- **RAM**: 2 GB minimum (4 GB+ recommended)
+- **Disk**: 500 MB minimum
 
-2. Select the appropriate configuration file:
-   ```bash
-   ln -s config.gcc config
-   ```
-
-   For 32-bit systems:
-   ```bash
-   ln -s config.gcc.32bits config
-   ```
-
-3. Compile:
-   ```bash
-   make
-   ```
-
-4. Add Basilisk to your PATH (optional but recommended):
-   ```bash
-   export BASILISK=$(pwd)
-   export PATH=$PATH:$BASILISK
-   echo "export BASILISK=$PWD" >> ~/.bashrc
-   echo 'export PATH=$PATH:$BASILISK' >> ~/.bashrc
-   ```
-
-### Python Interface Setup
-
-If you want to use Basilisk from Python:
-
-```bash
-sudo apt install swig libpython-dev
-```
-
-Configure the `MDFLAGS` and `PYTHONINCLUDE` variables in your `config` file, then:
-
-```bash
-make stream.py  # Example module
-```
+See the [Installation Guide](docs/INSTALLATION.md) for complete system requirements.
 
 ## Quick Start
 
@@ -146,12 +113,27 @@ basilisk-local/
 │   └── wsServer/     # WebSocket server for visualization
 ```
 
-## Documentation
+## 📖 Documentation
 
-- **Main Documentation**: See `src/README` for comprehensive solver documentation
-- **Tutorial**: Visit the official Basilisk tutorial at http://basilisk.fr/Tutorial
-- **Examples**: Browse `src/examples/` and `src/test/` directories
-- **Python Interface**: See `src/examples/example.py`
+### Essential Documentation
+
+- **[Installation Guide](docs/INSTALLATION.md)** - Complete setup instructions, system requirements, and troubleshooting
+- **[Documentation Hub](docs/README.md)** - Central documentation directory with guides and tutorials
+- **[Main Documentation](src/README)** - Comprehensive solver documentation in the source directory
+- **[Official Tutorial](http://basilisk.fr/Tutorial)** - Interactive online tutorial
+
+### Technical Guides
+
+- **[Axisymmetric Simulations](docs/guides/BASILISK_AXISYMMETRIC_GUIDE.md)** - Guide for axisymmetric coordinate systems
+- **[SHARP VOF Methods](docs/guides/SHARP-VOF-SUMMARY.md)** - Interface tracking with Volume-Of-Fluid methods
+- **[Reproduction Guide](docs/guides/REPRODUCTION_GUIDE.md)** - Reproduce simulation results
+- **[Code Review Summary](docs/guides/CODE_REVIEW_SUMMARY.md)** - Code quality and review findings
+
+### Examples and Case Studies
+
+- **Examples**: Browse `src/examples/` for sample programs
+- **Test Cases**: See `src/test/` for validation cases
+- **Case Studies**: Explore `cases/` and `ImpactForce-main/` directories
 
 ## Features by Category
 
@@ -214,11 +196,13 @@ Some components have specific licenses:
 - PPR library: See `src/ppr/LICENSE.md`
 - TinyRenderer: See `src/gl/tinyrenderer/LICENSE.txt`
 
-## Support and Community
+## 💬 Support and Community
 
-- **Official Website**: http://basilisk.fr
-- **Source Repository**: This repository contains the full Basilisk source code
-- **Issues**: For bugs and feature requests, please use the project's issue tracking system
+- **Official Website**: [basilisk.fr](http://basilisk.fr)
+- **Documentation**: [docs/](docs/)
+- **Tutorial**: [basilisk.fr/Tutorial](http://basilisk.fr/Tutorial)
+- **Issues**: Use GitHub's issue tracker for bug reports and feature requests
+- **Source Code**: Full source code available in this repository
 
 ## Citations
 
